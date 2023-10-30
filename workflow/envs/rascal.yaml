@@ -1,9 +1,14 @@
 name: rascal
+
 channels:
  - conda-forge
+ - bioconda
  - r
  - defaults
+
 dependencies:
  - r-base
- - devtools=2.4.5
- - 
+ - r-devtools=2.4.5
+ - r-ggplot2=3.4.4
+ - r-dplyr=1.1.3
+ - r-tidyverse=2.0.0
