@@ -1,0 +1,9 @@
+name: rascal
+channels:
+ - conda-forge
+ - r
+ - defaults
+dependencies:
+ - r-base
+ - devtools=2.4.5
+ - 
