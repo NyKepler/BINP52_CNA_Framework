@@ -21,7 +21,7 @@ For example: archive (pre-diagnosis), diagnosis, tumor tissue.
 """
 rule all:
     input:
-        expand('results/05_absolute_CN/{type_group}.solution.txt', type_group=sample_df.type_group)
+        expand('results/05_absolute_CN/{sample}.absoluteCN.csv', sample=sample_df.sample_name)
 
 
 ########## 1 Preprocessing ####################
@@ -210,8 +210,8 @@ The final output for this step is the relative copy number (CN) profile generate
 """
 rule relative_CN:
     input:
-        rds = 'results/04_relative_CN/' + config['type_group'] + '.rds',
-        tsv = 'results/04_relative_CN/' + config['type_group'] + '.tsv'
+        rds = 'results/04_relative_CN/{sample}.rds',
+        tsv = 'results/04_relative_CN/{sample}.tsv'
     
 # 4.1 generating relative CN profile
 rule QDNAseq:
@@ -219,11 +219,8 @@ rule QDNAseq:
     input:
         bam = expand('results/03_clean_up/{sample}.clean.bam')
     output:
-        raw_count = 'results/04_relative_CN/' + config['type_group'] + '/raw_readcounts.jpg',
-        correction = 'results/04_relative_CN/' + config['type_group'] + 'correction.jpg',
-        noise = 'results/04_relative_CN/' + config['type_group'] + 'noise.jpg',
-        rds = 'results/04_relative_CN' + config['type_group'] + '.rds',
-        tsv = 'results/04_relative_CN' + config['type_group'] + '.tsv'
+        rds = 'results/04_relative_CN/{sample}.rds',
+        tsv = 'results/04_relative_CN/{sample}.tsv'
     params:
         bam_dir = 'results/03_clean_up/'
     threads:
@@ -237,32 +234,32 @@ The final output for this step and also the workflow would be the absolute copy 
 """
 rule absolute_CN:
     input:
-        tsv = 'results/05_absoluteCN/' + config['type_group'] + '.absoluteCN.tsv'
+        tsv = 'results/05_absoluteCN/{sample}.absoluteCN.tsv'
 
-# 5.1 calculating the optimal solutions (ploidy and cellularity) and generating the absolute CN profile
-rule rascal:
-    input:
-        rds = 'results/04_relative_CN/' + config['type_group'] + '.rds'
+# 5.1 setting up the conda environment with rascal package downloaded from github
+rule rascal_env:
     output:
-        r_CN_plot = 'results/05_absolute_CN/' + config['type_group'] + '.relativeCN.jpg',
-        dis_heat = 'results/05_absolute_CN/' + config['type_group'] + '.distance_heatmap.jpg',
-        a_CN_plot = 'results/05_absolute_CN/' + config['type_group'] + '.absoluteCN.jpg',
-        solution = 'results/05_absolute_CN/' + config['type_group'] + '.solution.txt',
-        absolute_CN = 'results/05_absolute_CN/' + config['type_group'] + '.absoluteCN.tsv'
+        "other_info/rascal_settle_info.txt"
+    conda: 'envs/rascal.yaml'
+    script: 'scripts/rascal_env.R'
+
+
+# 5.2 generating absolute copy number profiles based on the optimal solutions
+rule rascal_absoluteCN:
+    input:
+        rds = 'results/04_relative_CN/{sample}.rds',
+        env_set = "other_info/rascal_settle_info.txt"
+    output:
+        solution = 'results/05_absolute_CN/{sample}.solution.csv',
+        solution_best = 'results/05_absolute_CN/{sample}.best_solution.csv',
+        absolute_CN = 'results/05_absolute_CN/{sample}.absoluteCN.csv'
     params:
+        output_prefix = 'results/05_absolute_CN/{sample}'
     threads:
     conda: 'envs/rascal.yaml'
-    script: 'script/rascal.r'
+    shell: '''
+    Rscript /workflow/scripts/fit_absoluteCN.R -i {input.rds} -o {params.output_prefix} 
+    '''
 
-# 5.2 (optional) provide another tool ichorCNA for generating the absolute CN profile
-rule ichorCNA:
-    input:
-        rds = 'results/04_relative_CN/' + config['type_group'] + '.rds'
-    output:
-
-    params:
-    threads:
-    conda:'env/ichorCNA.yaml'
-    script:'script/ichorCNA.r'
 
 
