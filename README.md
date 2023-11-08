@@ -7,14 +7,231 @@ Date: 2023/10/16 -
 This project is designed within a master thesis (BINP52). We aim to develop a pipeline to generate copy number profiles from shallow whole genome sequening (sWGS) samples.  
 
 ### 1.2 The pipeline
-The pipeline will include steps from preprocessing raw reads with QC to obtaining absolute copy number profiles.  
+The `Snakemake (v7.32.4)` pipeline will include steps from preprocessing raw reads with QC to obtaining absolute copy number profiles.  
 #### Steps
-- (1) Preprocessing. This step includes quality assessment and quality trimming on the raw reads. (`Fastp` will be used for QC and trimming, together with `multiQC` to generate the QC reports.) [Or `fastQC` + `Trimmomatic` + `multiQC`?]
-- (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment.)
-- (3) Clean-up. After alignment, the SAM files will be sorted and the PCR duplicates will be marked and removed. Also, the .sorted.deduplicated.sam will be converted to BAM files. The BAM files will be indexed for later analysis. (`Picard` will be used for sorting SAM, marking duplicates, removing duplicates and converting SAM to BAM. `samtools` will be used for indexing the BAM files.)
+The version of tools and packages to be used will be specified in each step (see chapter 2). The scripts within the pipeline are based on `Python (v3.11.6)` and `R (v4.3.1)`.
+- (1) Preprocessing. This step includes quality assessment and quality trimming on the raw reads. (`Fastp` will be used for QC and trimming, together with `fastqc` and `multiQC` to generate the QC reports.)
+- (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment. Or `BWA-MEM2`)
+- (3) Clean-up. After alignment, the SAM files will be sorted and the PCR duplicates will be marked and removed. Also, the .sorted.deduplicated.sam will be converted to BAM files. The BAM files will be indexed for later analysis. (`Picard` will be used for sorting SAM, marking duplicates, removing duplicates and converting SAM to BAM. `samtools` will be used for generating the clean_up stats and for indexing the BAM files.)
 - (4) Relative copy number profile. The BAM files will be analyzed through fixed-size binning, filtering, correction, normalization to generate the read counts per bin. This data will then used for segmentation of bins and generating the relative copy number profile. (`QDNAseq` will be used for this step.)
 - (5) Absolute copy number profile. The output file from `QDNAseq` contains relative copy number, and we need to estimate ploidy and cellularity in our samples to generate our final absolute copy number profile for comparison. (`Rascal` will be used for this step.)
 
 ## 2. Workflow Details
+### 2.0 Sample tables generation
+We include a python script `get_sample.py` to help generate the sample.tsv for each type of samples from the provided xlsx file describing the samples. The final sample.tsv for each type will include the following columns:  
+**sample_name**: the name of the sample (also the library)  
+**patient**: the patient ID  
+**fastq_1** and **fastq_2**: the paths of the sequencing reads  
+The sample.tsv to be used in the workflow should be specified in the `config.yaml`.
+
 ### 2.1 Preprocessing
-This step includes quality assessment and quality trimming on the raw reads.
+This step includes quality assessment and quality trimming on the raw reads.  
+*Tools, Packages and Dependencies*
+```
+ - fastp=0.23.4
+ - multiqc=1.17
+ - fastqc=0.12.1
+```
+Firstly, we used `fastp` to perform quality assessment and quality trimming on the raw reads. Each paired-end sample had a html file to view its sequencing stats before and after filtering and trimming.
+```
+rule fastp:
+    input:
+        R1 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_1'],
+        R2 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_2']
+    output:
+        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        html = 'results/01_preprocess/html/{sample}_fastp.html',
+        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+    log:
+        R1log = 'log/fastp/{sample}_R1_fastp.log',
+        R2log = 'log/fastp/{sample}_R2_fastp.log'
+    threads: 10
+    params: json = 'results/01_preprocess/html/{sample}_fastp.json'
+    conda: "envs/preprocess_env.yaml"
+    shell: """
+    fastp --detect_adapter_for_pe \
+        --correction --cut_right --thread {threads} \
+        --html {output.html} --json {params.json} \
+        --in1 {input.R1} --in2 {input.R2} \
+        --out1 {output.R1} --out2 {output.R2} \
+        2>{log.R1log}
+
+    sed \
+            's/{wildcards.sample}_R1/{wildcards.sample}_R2/g' \
+            {log.R1log} > {log.R2log}
+    
+    # we will delete the json files because we will use fastqc to generate qc reports, which are duplicated with the json files.
+    rm {params.json}
+    """
+```
+Secondly, we generated the qc reports with `fastqc` to investigate the quality of the preprocessed reads.
+```
+rule fastqc:
+    input:
+        R1_seq = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2_seq = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+    output:
+        R1_html = 'results/01_preprocess/html/{sample}_R1_preprocess_fastqc.html',
+        R1_qc = 'results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip',
+        R2_html = 'results/01_preprocess/html/{sample}_R2_preprocess_fastqc.html',
+        R2_qc = 'results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip'
+    log: 'log/fastqc/{sample}.fastqc.log'
+    params: 
+        outdir = 'results/01_preprocess/reports/'
+    threads: 10
+    conda: 'envs/preprocess_env.yaml'
+    shell: """
+    fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
+    mv results/01_preprocess/reports/*_fastqc.html results/01_preprocess/html/
+    """
+```
+Thirdly, we used `multiqc` to combine all the qc reports to generate a clear html showing the preprocessed stats.
+```
+rule multiqc:
+    input:
+        R1_qc = expand('results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
+        R2_qc= expand('results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
+    output:
+        'results/01_preprocess/reports/multiqc/samples_report.html'
+    log:
+        'log/multiqc.log'
+    params: outdir = 'results/01_preprocess/reports/multiqc/'
+    shell: """
+    multiqc -n samples_report.html \
+        -o {parmas.outdir} \
+        results/01_preprocess/reports/ 2>{log}
+    """
+```
+
+### 2.2 Alignment
+This step includes downloading hg19 reference genome (if not prepared), indexing reference genome, and mapping preprocessed reads to the reference.  
+*Tools, Packages and Dependencies*
+```
+ - bwa=0.7.17
+```
+
+Firstly, to prepare the hg19 reference genome, we provided a step to download the genome from Ensembl. If the genome has already been prepared, then it should be renamed into `hg19.ref.fa.gz`, which enables the automatic detection of the rule.
+```
+rule download_hg19:
+    ### if the hg19 reference genome does not exist, this rule will execute to download and generate the hg19 reference genome
+    output:
+        genome = 'resources/genome/hg19.ref.fa.gz'
+    log:
+        'resources/log/genome/download_hg19.log'
+    shell: """
+    wget 'https://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.alt.fa.gz' -O resources/genome/hg19.ref.fa.gz 2>{log}
+    """
+```
+
+Secondly, we used `bwa` to index the hg19 reference genome. The option `-a bwtsw`   
+*Note*: This step will take a long time, because we could not specify the threads. The `ìndex` function in `bwa` would only use 1 core at a time, which will take approximately 9 hours to finish the indexing.
+```
+rule bwa_index:
+    input:
+        genome = 'resources/genome/hg19.ref.fa.gz'
+    output:
+        multiext('resources/genome/hg19', ".amb", ".ann", ".bwt", ".pac", ".sa")
+    conda: 'envs/alignment.yaml'
+    log: 'log/bwa/bwa_index.log'
+    params: outdir = 'resources/genome/'
+    threads: 10
+    shell: """
+    bwa index -p hg19 -a bwtsw {input.genome}
+    mv hg19.* {params.outdir}
+    """
+```
+
+Thirdly, `bwa` was used again to map the preprocessed reads to the indexed genome.
+```
+rule map_reads:
+    input: 
+        idx = rules.bwa_index.output,
+        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+    output:
+        'results/02_alignment/{sample}.unsorted.sam'
+    log: 'log/bwa_mapping/{sample}.log'
+    params:
+        index_ref = 'resources/genome/hg19'
+    conda: 'envs/alignment.yaml'
+    threads: config['bwa_mapping']['threads']
+    shell: """
+    bwa mem -M -t {threads} \
+        {params.index_ref} {input.R1} {input.R2} > {output} \
+        2>{log}
+    """
+```
+
+### 2.3 Clean-up
+This step includes sorting the sam files, marking PCR duplicates, de-duplication, and indexing the final bam files.
+*Tools, Packages and Dependencies*
+```
+ - picard=2.18.7
+ - htslib=1.18
+ - samtools=1.18
+```
+Firstly, we used `picard` to sort the sam files with coordinate mode. And we removed the unsorted sam files to save space in the operational computer.
+```
+rule sort_sam: 
+    input:
+        'results/02_alignment/{sample}.unsorted.sam'
+    output:
+        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+    log: 'log/sort_sam/{sample}.log'
+    conda: 'envs/clean_up.yaml'
+    shell: """
+    picard SortSam \
+        INPUT={input} \
+        OUTPUT={output} \
+        SORT_ORDER=coordinate \
+        VALIDATION_STRINGENCY=SILENT \
+        2>{log}
+    
+    rm {input}
+    """
+```
+
+Secondly, we marked and removed the PCR duplicates detected by `picard`. Because we did not add the DT tag on our sorted sam files, so we decided to set `CLEAN_DT=false`.
+```
+rule de_duplicate:
+    input: 
+        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+    output:
+        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    log: 'log/de_duplicate/{sample}.log'
+    threads:
+    params:
+        metrix_file = 'results/03_clean_up/{sample}/{sample}.metrics.txt'
+    conda: 'envs/clean_up.yaml'
+    shell: """
+    picard MarkDuplicates \
+        INPUT={input} \
+        OUTPUT={output} \
+        METRICS_FILE={params.metrix_file} \
+        REMOVE_DUPLICATES=true \
+        ASSUME_SORT_ORDER=coordinate \
+        CLEAR_DT=false \
+        2>{log}
+    
+    rm {input}
+    """
+```
+
+Thirdly, we use `samtools` to show the clean-up stats and to index the bam files. The clean-up stats will be saved to the log file named with the sample names.
+```
+rule index_bam:
+    input:
+        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    output:
+        'results/03_clean_up/{sample}/{sample}.clean.bam'
+    log: 'log/bam_stat/{sample}.log'
+    threads: 10
+    conda: 'envs/clean_up.yaml'
+    shell: """
+    samtools flagstat {input} 2>{log}
+
+    samtools index -@ {threads} -o {output} {input}
+    """
+```
+
+### 2.4 Relative copy number profile
