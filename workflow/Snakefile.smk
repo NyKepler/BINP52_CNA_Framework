@@ -90,16 +90,17 @@ rule multiqc:
         R1_qc = expand(results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
         R2_qc= expand(results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
     output:
-        results + '01_preprocess/html/multiqc_report.html'
+        results + '01_preprocess/html/' + sample_group + '_multiqc_report.html'
     log:
         'log/multiqc.log'
     conda: 'envs/multiqc_env.yaml'
     params: 
+        out_name = sample_group + '_multiqc_report.html',
         indir = results + '01_preprocess/reports',
         outdir = results + '01_preprocess/html/',
         group = sample_group
     shell: """
-    multiqc -f -n {params.group}_multiqc_report.html \
+    multiqc -f -n {params.out_name} \
     -o {params.outdir} {params.indir} >{log} 2>{log}
     rm -r {params.outdir}/{params.group}_multiqc_report_data/
     """

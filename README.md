@@ -100,11 +100,12 @@ rule multiqc:
         'log/multiqc.log'
     conda: 'envs/multiqc_env.yaml'
     params: 
+        out_name = sample_group + '_multiqc_report.html',
         indir = results + '01_preprocess/reports',
         outdir = results + '01_preprocess/html/',
         group = sample_group
     shell: """
-    multiqc -f -n {params.group}_multiqc_report.html \
+    multiqc -f -n {params.out_name} \
     -o {params.outdir} {params.indir} >{log} 2>{log}
     rm -r {params.outdir}/{params.group}_multiqc_report_data/
     """
