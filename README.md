@@ -37,7 +37,7 @@ Before executing the workflow, we specified the final output for the *Preprocess
 ```
 rule preprocess:
     input:
-        'results/01_preprocess/html/multiqc_report.html'
+        results + '01_preprocess/html/' + sample_group + '_multiqc_report.html'
 ```
 
 Firstly, we used `fastp` to perform quality assessment and quality trimming on the raw reads. Each paired-end sample had a html file to view its sequencing stats before and after filtering and trimming.
@@ -47,14 +47,12 @@ rule fastp:
         R1 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_1'],
         R2 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_2']
     output:
-        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        html = 'results/01_preprocess/html/{sample}_fastp.html',
-        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
-    log:
-        R1log = 'log/fastp/{sample}_R1_fastp.log',
-        R2log = 'log/fastp/{sample}_R2_fastp.log'
+        R1 = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        html = results + '01_preprocess/html/{sample}_fastp.html',
+        R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+    log: 'log/fastp/{sample}_fastp.log'
     threads: 10
-    params: json = 'results/01_preprocess/html/{sample}_fastp.json'
+    params: json = results + '01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
     fastp --detect_adapter_for_pe \
@@ -62,13 +60,8 @@ rule fastp:
         --html {output.html} --json {params.json} \
         --in1 {input.R1} --in2 {input.R2} \
         --out1 {output.R1} --out2 {output.R2} \
-        2>{log.R1log}
-
-    sed \
-            's/{wildcards.sample}_R1/{wildcards.sample}_R2/g' \
-            {log.R1log} > {log.R2log}
+        2>{log}
     
-    # we will delete the json files because we will use fastqc to generate qc reports, which are duplicated with the json files.
     rm {params.json}
     """
 ```
@@ -76,21 +69,22 @@ Secondly, we generated the qc reports with `fastqc` to investigate the quality o
 ```
 rule fastqc:
     input:
-        R1_seq = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        R2_seq = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+        R1_seq = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2_seq = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
-        R1_html = 'results/01_preprocess/html/{sample}_R1_preprocess_fastqc.html',
-        R1_qc = 'results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip',
-        R2_html = 'results/01_preprocess/html/{sample}_R2_preprocess_fastqc.html',
-        R2_qc = 'results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip'
+        R1_html = results + '01_preprocess/html/{sample}_R1_preprocess_fastqc.html',
+        R1_qc = results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip',
+        R2_html = results + '01_preprocess/html/{sample}_R2_preprocess_fastqc.html',
+        R2_qc = results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip'
     log: 'log/fastqc/{sample}.fastqc.log'
     params: 
-        outdir = 'results/01_preprocess/reports/'
+        outdir = results + '01_preprocess/reports/',
+        out_html = results + '01_preprocess/html/'
     threads: 10
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
-    mv results/01_preprocess/reports/*_fastqc.html results/01_preprocess/html/
+    mv {params.outdir}*_fastqc.html {params.out_html}
     """
 ```
 Thirdly, we used `multiqc` to combine all the qc reports to generate a clear html showing the preprocessed stats.  
@@ -98,20 +92,21 @@ Thirdly, we used `multiqc` to combine all the qc reports to generate a clear htm
 ```
 rule multiqc:
     input:
-        R1_qc = expand('results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
-        R2_qc= expand('results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
+        R1_qc = expand(results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
+        R2_qc= expand(results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
     output:
-        'results/01_preprocess/html/multiqc_report.html'
+        results + '01_preprocess/html/' + sample_group + '_multiqc_report.html'
     log:
         'log/multiqc.log'
     conda: 'envs/multiqc_env.yaml'
     params: 
-        indir = 'results/01_preprocess/reports',
-        outdir = 'results/01_preprocess/html/'
+        indir = results + '01_preprocess/reports',
+        outdir = results + '01_preprocess/html/',
+        group = sample_group
     shell: """
-    multiqc -f -n multiqc_report.html \
+    multiqc -f -n {params.group}_multiqc_report.html \
     -o {params.outdir} {params.indir} >{log} 2>{log}
-    rm -r {params.outdir}/multiqc_report_data/
+    rm -r {params.outdir}/{params.group}_multiqc_report_data/
     """
 ```
 
@@ -125,7 +120,7 @@ Before we executing this step, we specified the final output of *Alignment*.
 ```
 rule alignment:
     input:
-        expand('results/02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
+        expand(results + '02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
 ```
 
 Firstly, to prepare the hg19 reference genome, we provided a step to download the genome from Ensembl. If the genome has already been prepared, then it should be renamed into `hg19.ref.fa.gz`, which enables the automatic detection of the rule.
@@ -165,10 +160,10 @@ rule map_reads:
     input: 
         idx = rules.bwa_index.output,
         link_up = rules.preprocess.input,
-        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+        R1 = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
-        'results/02_alignment/{sample}.unsorted.sam'
+        results + '02_alignment/{sample}.unsorted.sam'
     log: 'log/bwa_mapping/{sample}.log'
     params:
         index_ref = 'resources/genome/hg19'
@@ -195,17 +190,17 @@ Before we executing this step, we specified the final output of *Clean-up*.
 ```
 rule clean_up:
     input: 
-        expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
+        expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 ```
 
 Firstly, we used `picard` to sort the sam files with coordinate mode. And we removed the unsorted sam files to save space in the operational computer.
 ```
 rule sort_sam: 
     input:
-        sam = 'results/02_alignment/{sample}.unsorted.sam',
+        sam = results + '02_alignment/{sample}.unsorted.sam',
         link_up = rules.alignment.input
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+        results + '03_clean_up/{sample}/{sample}.sorted.sam'
     log: 'log/sort_sam/{sample}.log'
     conda: 'envs/clean_up.yaml'
     shell: """
@@ -215,6 +210,7 @@ rule sort_sam:
         SORT_ORDER=coordinate \
         VALIDATION_STRINGENCY=SILENT \
         2>{log}
+
     """
 ```
 
@@ -222,13 +218,13 @@ Secondly, we marked and removed the PCR duplicates detected by `picard`. Because
 ```
 rule de_duplicate:
     input: 
-        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+        results + '03_clean_up/{sample}/{sample}.sorted.sam'
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
     threads:10
     params:
-        metrix_file = 'results/03_clean_up/{sample}/{sample}.metrics.txt'
+        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
     shell: """
     picard MarkDuplicates \
@@ -248,9 +244,9 @@ Thirdly, we use `samtools` to show the clean-up stats and to index the bam files
 ```
 rule index_bam:
     input:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bai'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/{sample}.log'
     threads: 10
     conda: 'envs/clean_up.yaml'
