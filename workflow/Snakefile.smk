@@ -7,12 +7,16 @@ import pandas as pd
 # specify the configuration file
 configfile: "config/config.yaml"
 
-# specify the samples
+# specify the samples and their groups
 sample_df = (pd.read_csv(config['samples'], 
     sep='\t', 
     dtype={'sample_name':str, 'patient':str, 'fastq_1':str, 'fastq_2':str})
     .set_index('sample_name', drop=False))
 
+sample_group = config['type']
+
+# specify the results location (output directory)
+results = config['outputdir']
 
 # specify the final output of the whole workflow
 """
@@ -21,7 +25,7 @@ For example: archive (pre-diagnosis), diagnosis, tumor tissue.
 """
 rule all:
     input:
-        expand('results/05_absolute_CN/{sample}.absoluteCN.csv', sample=sample_df.sample_name)
+        expand(results + '05_absolute_CN/{sample}.absoluteCN.csv', sample=sample_df.sample_name)
 
 
 ########## 1 Preprocessing ####################
@@ -30,7 +34,7 @@ The final output for the step preprocessing should be a multiqc report generatin
 """
 rule preprocess:
     input:
-        'results/01_preprocess/html/multiqc_report.html'
+        results + '01_preprocess/html/' + sample_group + '_multiqc_report.html'
 
 # 1.1 quality trimming on reads
 rule fastp:
@@ -39,12 +43,12 @@ rule fastp:
         R1 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_1'],
         R2 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_2']
     output:
-        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        html = 'results/01_preprocess/html/{sample}_fastp.html',
-        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+        R1 = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        html = results + '01_preprocess/html/{sample}_fastp.html',
+        R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     log: 'log/fastp/{sample}_fastp.log'
     threads: 10
-    params: json = 'results/01_preprocess/html/{sample}_fastp.json'
+    params: json = results + '01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
     fastp --detect_adapter_for_pe \
@@ -61,41 +65,43 @@ rule fastp:
 rule fastqc:
     ### we will use fastqc to generate the quality control stats from the outputs of fastp
     input:
-        R1_seq = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        R2_seq = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+        R1_seq = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2_seq = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
-        R1_html = 'results/01_preprocess/html/{sample}_R1_preprocess_fastqc.html',
-        R1_qc = 'results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip',
-        R2_html = 'results/01_preprocess/html/{sample}_R2_preprocess_fastqc.html',
-        R2_qc = 'results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip'
+        R1_html = results + '01_preprocess/html/{sample}_R1_preprocess_fastqc.html',
+        R1_qc = results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip',
+        R2_html = results + '01_preprocess/html/{sample}_R2_preprocess_fastqc.html',
+        R2_qc = results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip'
     log: 'log/fastqc/{sample}.fastqc.log'
     params: 
-        outdir = 'results/01_preprocess/reports/'
+        outdir = results + '01_preprocess/reports/',
+        out_html = results + '01_preprocess/html/'
     threads: 10
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
-    mv results/01_preprocess/reports/*_fastqc.html results/01_preprocess/html/
+    mv {params.outdir}*_fastqc.html {params.out_html}
     """
 
 # 1.3 quality assessment report for the reads
 rule multiqc:
     ### we will use multiqc here to generate reports from the output of fastqc.
     input:
-        R1_qc = expand('results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
-        R2_qc= expand('results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
+        R1_qc = expand(results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
+        R2_qc= expand(results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
     output:
-        'results/01_preprocess/html/multiqc_report.html'
+        results + '01_preprocess/html/multiqc_report.html'
     log:
         'log/multiqc.log'
     conda: 'envs/multiqc_env.yaml'
     params: 
-        indir = 'results/01_preprocess/reports',
-        outdir = 'results/01_preprocess/html/'
+        indir = results + '01_preprocess/reports',
+        outdir = results + '01_preprocess/html/',
+        group = sample_group
     shell: """
-    multiqc -f -n multiqc_report.html \
+    multiqc -f -n {params.group}_multiqc_report.html \
     -o {params.outdir} {params.indir} >{log} 2>{log}
-    rm -r {params.outdir}/multiqc_report_data/
+    rm -r {params.outdir}/{params.group}_multiqc_report_data/
     """
 
 
@@ -105,7 +111,7 @@ The final output for the alignment step would be the unsorted BAM files for all 
 """
 rule alignment:
     input:
-        expand('results/02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
+        expand(results + '02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
 
 # 2.1 downloading the human reference genome (GRCh37 - hg19)
 ## using hg19 because the QDNAseq in the later steps requires hg19 for generating CN profiles
@@ -142,10 +148,10 @@ rule map_reads:
     input: 
         idx = rules.bwa_index.output,
         link_up = rules.preprocess.input,
-        R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
-        R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
+        R1 = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
+        R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
-        'results/02_alignment/{sample}.unsorted.sam'
+        results + '02_alignment/{sample}.unsorted.sam'
     log: 'log/bwa_mapping/{sample}.log'
     params:
         index_ref = 'resources/genome/hg19'
@@ -164,16 +170,16 @@ The final output for the clean-up step should be the sorted, marked, and indexed
 """
 rule clean_up:
     input: 
-        expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
+        expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 
 # 3.1 sorting the SAM files
 rule sort_sam: 
     ### using Picard to sort the sam files 
     input:
-        sam = 'results/02_alignment/{sample}.unsorted.sam',
+        sam = results + '02_alignment/{sample}.unsorted.sam',
         link_up = rules.alignment.input
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+        results + '03_clean_up/{sample}/{sample}.sorted.sam'
     log: 'log/sort_sam/{sample}.log'
     conda: 'envs/clean_up.yaml'
     shell: """
@@ -190,13 +196,13 @@ rule sort_sam:
 rule de_duplicate:
     ### using Picard to remove PCR duplicates, and convert SAM file into BAM files
     input: 
-        'results/03_clean_up/{sample}/{sample}.sorted.sam'
+        results + '03_clean_up/{sample}/{sample}.sorted.sam'
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
     threads:10
     params:
-        metrix_file = 'results/03_clean_up/{sample}/{sample}.metrics.txt'
+        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
     shell: """
     picard MarkDuplicates \
@@ -216,9 +222,9 @@ rule de_duplicate:
 rule index_bam:
     ### using samtools to show the stats of the sorted and deduplicates outputs and to index the BAM files
     input:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
-        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bai'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/{sample}.log'
     threads: 10
     conda: 'envs/clean_up.yaml'
@@ -237,15 +243,14 @@ The final output for this step is the relative copy number (CN) profile generate
 """
 rule relative_CN:
     input:
-        rds = 'results/04_relative_CN/{sample}.rds',
-        tsv = 'results/04_relative_CN/{sample}.tsv'
+        rds = results + '04_relative_CN/{sample}.rds',
+        tsv = results + '04_relative_CN/{sample}.tsv'
     
 # 4.1 generating relative CN profile
 rule QDNAseq:
     ### QDNAseq will be applied to generate relative copy number profile stored in RDS and tsv files for later analyses.
     input:
-        link_up = rules.clean_up.input,
-        bai = expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai')
+        link_up = rules.clean_up.input
     output:
         rds = 'results/04_relative_CN/{sample}.rds',
         tsv = 'results/04_relative_CN/{sample}.tsv'
@@ -262,13 +267,13 @@ The final output for this step and also the workflow would be the absolute copy 
 """
 rule absolute_CN:
     input:
-        tsv = 'results/05_absoluteCN/{sample}.absoluteCN.tsv'
+        tsv = results + '05_absoluteCN/{sample}.absoluteCN.tsv'
 
 # 5.1 setting up the conda environment with rascal package downloaded from github
 rule rascal_env:
-    input: rules.absolute_CN.input
+    input: rules.relative_CN.input
     output:
-        "other_info/rascal_settle_info.txt"
+        results + "other_info/rascal_settle_info.txt"
     conda: 'envs/rascal.yaml'
     script: 'scripts/rascal_env.R'
 
@@ -276,15 +281,15 @@ rule rascal_env:
 # 5.2 generating absolute copy number profiles based on the optimal solutions
 rule rascal_absoluteCN:
     input:
-        rds = 'results/04_relative_CN/{sample}.rds',
-        env_set = "other_info/rascal_settle_info.txt"
+        rds = results + '04_relative_CN/{sample}.rds',
+        env_set = results + "other_info/rascal_settle_info.txt"
     output:
-        solution = 'results/05_absolute_CN/{sample}.solution.csv',
-        solution_best = 'results/05_absolute_CN/{sample}.best_solution.csv',
-        absolute_CN = 'results/05_absolute_CN/{sample}.absoluteCN.csv'
-        absolute_CN_seg = 'results/05_absolute_CN/{sample}.absoluteCN.seg.csv'
+        solution = results + '05_absolute_CN/{sample}.solution.csv',
+        solution_best = results + '05_absolute_CN/{sample}.best_solution.csv',
+        absolute_CN = results + '05_absolute_CN/{sample}.absoluteCN.csv'
+        absolute_CN_seg = results + '05_absolute_CN/{sample}.absoluteCN.seg.csv'
     params:
-        output_prefix = 'results/05_absolute_CN/{sample}'
+        output_prefix = results + '05_absolute_CN/{sample}'
     threads:
     conda: 'envs/rascal.yaml'
     shell: '''
