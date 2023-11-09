@@ -28,10 +28,18 @@ The sample.tsv to be used in the workflow should be specified in the `config.yam
 This step includes quality assessment and quality trimming on the raw reads.  
 *Tools, Packages and Dependencies*
 ```
- - fastp=0.23.4
- - multiqc=1.17
- - fastqc=0.12.1
+  - fastp=0.23.4
+  - multiqc=1.17
+  - fastqc=0.12.1
+  - typing_extension=4.8.0
 ```
+Before executing the workflow, we specified the final output for the *Preprocessing* step.
+```
+rule preprocess:
+    input:
+        'results/01_preprocess/html/multiqc_report.html'
+```
+
 Firstly, we used `fastp` to perform quality assessment and quality trimming on the raw reads. Each paired-end sample had a html file to view its sequencing stats before and after filtering and trimming.
 ```
 rule fastp:
@@ -85,21 +93,25 @@ rule fastqc:
     mv results/01_preprocess/reports/*_fastqc.html results/01_preprocess/html/
     """
 ```
-Thirdly, we used `multiqc` to combine all the qc reports to generate a clear html showing the preprocessed stats.
+Thirdly, we used `multiqc` to combine all the qc reports to generate a clear html showing the preprocessed stats.  
+*Note*: `multiqc` running in our workflow required the module `typing_extension`, otherwise it could not be run successfully in our local computer. More details could be found in the `envs/multiqc_env.yaml`.
 ```
 rule multiqc:
     input:
         R1_qc = expand('results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
         R2_qc= expand('results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
     output:
-        'results/01_preprocess/reports/multiqc/samples_report.html'
+        'results/01_preprocess/html/multiqc_report.html'
     log:
         'log/multiqc.log'
-    params: outdir = 'results/01_preprocess/reports/multiqc/'
+    conda: 'envs/multiqc_env.yaml'
+    params: 
+        indir = 'results/01_preprocess/reports',
+        outdir = 'results/01_preprocess/html/'
     shell: """
-    multiqc -n samples_report.html \
-        -o {parmas.outdir} \
-        results/01_preprocess/reports/ 2>{log}
+    multiqc -f -n multiqc_report.html \
+    -o {params.outdir} {params.indir} >{log} 2>{log}
+    rm -r {params.outdir}/multiqc_report_data/
     """
 ```
 
@@ -108,6 +120,12 @@ This step includes downloading hg19 reference genome (if not prepared), indexing
 *Tools, Packages and Dependencies*
 ```
  - bwa=0.7.17
+```
+Before we executing this step, we specified the final output of *Alignment*.
+```
+rule alignment:
+    input:
+        expand('results/02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
 ```
 
 Firstly, to prepare the hg19 reference genome, we provided a step to download the genome from Ensembl. If the genome has already been prepared, then it should be renamed into `hg19.ref.fa.gz`, which enables the automatic detection of the rule.
@@ -146,6 +164,7 @@ Thirdly, `bwa` was used again to map the preprocessed reads to the indexed genom
 rule map_reads:
     input: 
         idx = rules.bwa_index.output,
+        link_up = rules.preprocess.input,
         R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
         R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
@@ -166,28 +185,36 @@ rule map_reads:
 This step includes sorting the sam files, marking PCR duplicates, de-duplication, and indexing the final bam files.
 *Tools, Packages and Dependencies*
 ```
- - picard=2.18.7
- - htslib=1.18
- - samtools=1.18
+  - picard=2.18.7
+  - htslib=1.18
+  - samtools=1.18
+  - qualimap=2.2.2d
 ```
+
+Before we executing this step, we specified the final output of *Clean-up*.
+```
+rule clean_up:
+    input: 
+        expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
+```
+
 Firstly, we used `picard` to sort the sam files with coordinate mode. And we removed the unsorted sam files to save space in the operational computer.
 ```
 rule sort_sam: 
     input:
-        'results/02_alignment/{sample}.unsorted.sam'
+        sam = 'results/02_alignment/{sample}.unsorted.sam',
+        link_up = rules.alignment.input
     output:
         'results/03_clean_up/{sample}/{sample}.sorted.sam'
     log: 'log/sort_sam/{sample}.log'
     conda: 'envs/clean_up.yaml'
     shell: """
     picard SortSam \
-        INPUT={input} \
+        INPUT={input.sam} \
         OUTPUT={output} \
         SORT_ORDER=coordinate \
         VALIDATION_STRINGENCY=SILENT \
         2>{log}
-    
-    rm {input}
     """
 ```
 
@@ -199,7 +226,7 @@ rule de_duplicate:
     output:
         'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
-    threads:
+    threads:10
     params:
         metrix_file = 'results/03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
@@ -223,15 +250,16 @@ rule index_bam:
     input:
         'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
-        'results/03_clean_up/{sample}/{sample}.clean.bam'
+        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/{sample}.log'
     threads: 10
     conda: 'envs/clean_up.yaml'
     shell: """
-    samtools flagstat {input} 2>{log}
+    samtools flagstat {input} | tee {log}
 
     samtools index -@ {threads} -o {output} {input}
     """
 ```
+Also, if required, we used `qualimap` to generate the stats of the BAM files: `qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G`.
 
 ### 2.4 Relative copy number profile

@@ -30,7 +30,7 @@ The final output for the step preprocessing should be a multiqc report generatin
 """
 rule preprocess:
     input:
-        'results/01_preprocess/report/samples_report.html'
+        'results/01_preprocess/html/multiqc_report.html'
 
 # 1.1 quality trimming on reads
 rule fastp:
@@ -42,9 +42,7 @@ rule fastp:
         R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
         html = 'results/01_preprocess/html/{sample}_fastp.html',
         R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
-    log:
-        R1log = 'log/fastp/{sample}_R1_fastp.log',
-        R2log = 'log/fastp/{sample}_R2_fastp.log'
+    log: 'log/fastp/{sample}_fastp.log'
     threads: 10
     params: json = 'results/01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
@@ -54,11 +52,7 @@ rule fastp:
         --html {output.html} --json {params.json} \
         --in1 {input.R1} --in2 {input.R2} \
         --out1 {output.R1} --out2 {output.R2} \
-        2>{log.R1log}
-
-    sed \
-            's/{wildcards.sample}_R1/{wildcards.sample}_R2/g' \
-            {log.R1log} > {log.R2log}
+        2>{log}
     
     rm {params.json}
     """
@@ -91,14 +85,17 @@ rule multiqc:
         R1_qc = expand('results/01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
         R2_qc= expand('results/01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
     output:
-        'results/01_preprocess/reports/multiqc/samples_report.html'
+        'results/01_preprocess/html/multiqc_report.html'
     log:
         'log/multiqc.log'
-    params: outdir = 'results/01_preprocess/reports/multiqc/'
+    conda: 'envs/multiqc_env.yaml'
+    params: 
+        indir = 'results/01_preprocess/reports',
+        outdir = 'results/01_preprocess/html/'
     shell: """
-    multiqc -n samples_report.html \
-        -o {parmas.outdir} \
-        results/01_preprocess/reports/ 2>{log}
+    multiqc -f -n multiqc_report.html \
+    -o {params.outdir} {params.indir} >{log} 2>{log}
+    rm -r {params.outdir}/multiqc_report_data/
     """
 
 
@@ -108,7 +105,7 @@ The final output for the alignment step would be the unsorted BAM files for all 
 """
 rule alignment:
     input:
-        expand('results/02_alignment/{sample}.unsorted.bam', sample=sample_df.sample_name)
+        expand('results/02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
 
 # 2.1 downloading the human reference genome (GRCh37 - hg19)
 ## using hg19 because the QDNAseq in the later steps requires hg19 for generating CN profiles
@@ -117,9 +114,9 @@ rule download_hg19:
     output:
         genome = 'resources/genome/hg19.ref.fa.gz'
     log:
-        'resources/log/genome/download_hg19.log'
+        'log/genome/download_hg19.log'
     shell: """
-    wget 'https://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.alt.fa.gz' -O resources/genome/hg19.ref.fa.gz 2>{log}
+    wget 'https://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.alt.fa.gz' -O {output.genome} 2>{log}
     """
 
 # 2.2 indexing the hg19 reference genome
@@ -144,6 +141,7 @@ rule map_reads:
     ### use bwa again for alignment
     input: 
         idx = rules.bwa_index.output,
+        link_up = rules.preprocess.input,
         R1 = 'results/01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
         R2 = 'results/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     output:
@@ -166,26 +164,26 @@ The final output for the clean-up step should be the sorted, marked, and indexed
 """
 rule clean_up:
     input: 
-        expand('results/03_clean_up/{sample}.clean.bam', sample=sample_df.sample_name)
+        expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 
 # 3.1 sorting the SAM files
 rule sort_sam: 
-    ### using Picard to sort the sam files and remove the unsorted ones to save space
+    ### using Picard to sort the sam files 
     input:
-        'results/02_alignment/{sample}.unsorted.sam'
+        sam = 'results/02_alignment/{sample}.unsorted.sam',
+        link_up = rules.alignment.input
     output:
         'results/03_clean_up/{sample}/{sample}.sorted.sam'
     log: 'log/sort_sam/{sample}.log'
     conda: 'envs/clean_up.yaml'
     shell: """
     picard SortSam \
-        INPUT={input} \
+        INPUT={input.sam} \
         OUTPUT={output} \
         SORT_ORDER=coordinate \
         VALIDATION_STRINGENCY=SILENT \
         2>{log}
-    
-    rm {input}
+
     """
 
 # 3.2 marking dupicates and de-duplication
@@ -196,7 +194,7 @@ rule de_duplicate:
     output:
         'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
-    threads:
+    threads:10
     params:
         metrix_file = 'results/03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
@@ -216,19 +214,22 @@ rule de_duplicate:
 
 # 3.3 indexing the BAM files
 rule index_bam:
-    ### using samtools to show the stats of the sorted and deduplicates outputs and to index the bam files
+    ### using samtools to show the stats of the sorted and deduplicates outputs and to index the BAM files
     input:
         'results/03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
-        'results/03_clean_up/{sample}/{sample}.clean.bam'
+        'results/03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/{sample}.log'
     threads: 10
     conda: 'envs/clean_up.yaml'
     shell: """
-    samtools flagstat {input} 2>{log}
+    samtools flagstat {input} | tee {log}
 
     samtools index -@ {threads} -o {output} {input}
     """
+
+# to test the quality of the BAM files: using qualimap
+# qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G
 
 ########## 4 Relative CN profile ####################
 """
@@ -243,12 +244,13 @@ rule relative_CN:
 rule QDNAseq:
     ### QDNAseq will be applied to generate relative copy number profile stored in RDS and tsv files for later analyses.
     input:
-        bam = expand('results/03_clean_up/{sample}.clean.bam')
+        link_up = rules.clean_up.input,
+        bai = expand('results/03_clean_up/{sample}/{sample}.sorted.dedup.bai')
     output:
         rds = 'results/04_relative_CN/{sample}.rds',
         tsv = 'results/04_relative_CN/{sample}.tsv'
     params:
-        bam_dir = 'results/03_clean_up/'
+        bam_dir = 'results/03_clean_up/{sample}/'
     threads:
     conda: 'envs/QDNAseq.yaml'
     script: 'script/QDNAseq.r'
@@ -264,6 +266,7 @@ rule absolute_CN:
 
 # 5.1 setting up the conda environment with rascal package downloaded from github
 rule rascal_env:
+    input: rules.absolute_CN.input
     output:
         "other_info/rascal_settle_info.txt"
     conda: 'envs/rascal.yaml'
@@ -287,5 +290,6 @@ rule rascal_absoluteCN:
     shell: '''
     Rscript /workflow/scripts/fit_absoluteCN.R -i {input.rds} -o {params.output_prefix} 
     '''
+
 
 
