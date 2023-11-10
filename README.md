@@ -209,7 +209,6 @@ rule sort_sam:
         INPUT={input.sam} \
         OUTPUT={output} \
         SORT_ORDER=coordinate \
-        VALIDATION_STRINGENCY=SILENT \
         2>{log}
 
     """
