@@ -123,7 +123,16 @@ rule download_hg19:
     log:
         'log/genome/download_hg19.log'
     shell: """
-    wget 'https://ftp.ensembl.org/pub/grch37/current/fasta/homo_sapiens/dna/Homo_sapiens.GRCh37.dna.alt.fa.gz' -O {output.genome} 2>{log}
+    for i in $(seq 1 22) X; do echo $i; wget http://hgdownload.cse.ucsc.edu/goldenPath/hg19/chromosomes/chr${i}.fa.gz -O resources/genome/chr${i}.fa.gz; done 2>{log}
+
+    gunzip resources/genome/*.gz
+    
+    for a in $(seq 1 22) X; do cat resources/genome/chr${a}.fa >> resources/genome/hg19.ref.fa; done
+
+    gzip resources/genome/hg19.ref.fa
+
+    rm *.fa
+
     """
 
 # 2.2 indexing the hg19 reference genome

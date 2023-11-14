@@ -1,48 +1,40 @@
-# README for the CNA Framework
-Author: Guyuan Tang  
-Date: 2023/10/16 - 
+import pandas as pd
 
-## 1. Description 
-### 1.1 The project
-This project is designed within a master thesis (BINP52). We aim to develop a pipeline to generate copy number profiles from shallow whole genome sequening (sWGS) samples.  
+# specify the configuration file
+configfile: "config/config.yaml"
 
-### 1.2 The pipeline
-The `Snakemake (v7.32.4)` pipeline will include steps from preprocessing raw reads with QC to obtaining absolute copy number profiles.  
-#### Steps
-The version of tools and packages to be used will be specified in each step (see chapter 2). The scripts within the pipeline are based on `Python (v3.11.6)` and `R (v4.3.1)`.
-- (1) Preprocessing. This step includes quality assessment and quality trimming on the raw reads. (`Fastp` will be used for QC and trimming, together with `fastqc` and `multiQC` to generate the QC reports.)
-- (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment. Or `BWA-MEM2`)
-- (3) Clean-up. After alignment, the SAM files will be sorted and the PCR duplicates will be marked and removed. Also, the .sorted.deduplicated.sam will be converted to BAM files. The BAM files will be indexed for later analysis. (`Picard` will be used for sorting SAM, marking duplicates, removing duplicates and converting SAM to BAM. `samtools` will be used for generating the clean_up stats and for indexing the BAM files.)
-- (4) Relative copy number profile. The BAM files will be analyzed through fixed-size binning, filtering, correction, normalization to generate the read counts per bin. This data will then used for segmentation of bins and generating the relative copy number profile. (`QDNAseq` will be used for this step.)
-- (5) Absolute copy number profile. The output file from `QDNAseq` contains relative copy number, and we need to estimate ploidy and cellularity in our samples to generate our final absolute copy number profile for comparison. (`Rascal` will be used for this step.)
+# specify the samples
+sample_df = (pd.read_csv(config['samples'], 
+    sep='\t', 
+    dtype={'sample_name':str, 'patient':str, 'fastq_1':str, 'fastq_2':str})
+    .set_index('sample_name', drop=False))
 
-## 2. Workflow Details
-### 2.0 Sample tables generation
-We include a python script `get_sample.py` to help generate the sample.tsv for each type of samples from the provided xlsx file describing the samples. The final sample.tsv for each type will include the following columns:  
-**sample_name**: the name of the sample (also the library)  
-**patient**: the patient ID  
-**fastq_1** and **fastq_2**: the paths of the sequencing reads  
-The sample.tsv to be used in the workflow should be specified in the `config.yaml`.
+sample_group = config['type']
 
-### 2.1 Preprocessing
-This step includes quality assessment and quality trimming on the raw reads.  
-*Tools, Packages and Dependencies*
-```
-  - fastp=0.23.4
-  - multiqc=1.17
-  - fastqc=0.12.1
-  - typing_extension=4.8.0
-```
-Before executing the workflow, we specified the final output for the *Preprocessing* step.
-```
+# specify the results location (output directory)
+results = config['outputdir']
+
+# specify the final output of the whole workflow
+"""
+the final output for the whole workflow should be the absolute copy number profile for each type/group of samples.
+For example: archive (pre-diagnosis), diagnosis, tumor tissue.
+"""
+rule all:
+    input:
+        expand(results + '04_ichorCNA/{sample}/{sample}.cna.seg', sample=sample_df.sample_name)
+
+
+########## 1 Preprocessing ####################
+"""
+The final output for the step preprocessing should be a multiqc report generating all the preprocessed QC statistics.
+"""
 rule preprocess:
     input:
         results + '01_preprocess/html/' + sample_group + '_multiqc_report.html'
-```
 
-Firstly, we used `fastp` to perform quality assessment and quality trimming on the raw reads. Each paired-end sample had a html file to view its sequencing stats before and after filtering and trimming.
-```
+# 1.1 quality trimming on reads
 rule fastp:
+    ### we will use fastp here for trimming on adapter and quality.
     input:
         R1 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_1'],
         R2 = lambda wildcards: sample_df.loc[wildcards.sample, 'fastq_2']
@@ -64,10 +56,10 @@ rule fastp:
     
     rm {params.json}
     """
-```
-Secondly, we generated the qc reports with `fastqc` to investigate the quality of the preprocessed reads.
-```
+
+# 1.2 quality assessment of preprocessed reads with fastqc
 rule fastqc:
+    ### we will use fastqc to generate the quality control stats from the outputs of fastp
     input:
         R1_seq = results + '01_preprocess/reads/{sample}_R1_preprocess.fastq.gz',
         R2_seq = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
@@ -86,11 +78,10 @@ rule fastqc:
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
     mv {params.outdir}*_fastqc.html {params.out_html}
     """
-```
-Thirdly, we used `multiqc` to combine all the qc reports to generate a clear html showing the preprocessed stats.  
-*Note*: `multiqc` running in our workflow required the module `typing_extension`, otherwise it could not be run successfully in our local computer. More details could be found in the `envs/multiqc_env.yaml`.
-```
+
+# 1.3 quality assessment report for the reads
 rule multiqc:
+    ### we will use multiqc here to generate reports from the output of fastqc.
     input:
         R1_qc = expand(results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.zip', sample=sample_df.sample_name),
         R2_qc= expand(results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.zip', sample=sample_df.sample_name)
@@ -109,23 +100,18 @@ rule multiqc:
     -o {params.outdir} {params.indir} >{log} 2>{log}
     rm -r {params.outdir}/{params.group}_multiqc_report_data/
     """
-```
 
-### 2.2 Alignment
-This step includes downloading hg19 reference genome (if not prepared), indexing reference genome, and mapping preprocessed reads to the reference.  
-*Tools, Packages and Dependencies*
-```
- - bwa=0.7.17
-```
-Before we executing this step, we specified the final output of *Alignment*.
-```
+
+########## 2 Alignment ####################
+"""
+The final output for the alignment step would be the unsorted BAM files for all the included samples.
+"""
 rule alignment:
     input:
         expand(results + '02_alignment/{sample}.unsorted.sam', sample=sample_df.sample_name)
-```
 
-Firstly, to prepare the hg19 reference genome, we provided a step to download the genome from UCSC. We downloaded the selected chromosomes (1-22, X) sequencing and combined them together as the hg19.ref.fa. If the genome has already been prepared, then it should be renamed into `hg19.ref.fa.gz`, which enables the automatic detection of the rule.
-```
+# 2.1 downloading the human reference genome (GRCh37 - hg19)
+## using hg19 because the QDNAseq in the later steps requires hg19 for generating CN profiles
 rule download_hg19:
     ### if the hg19 reference genome does not exist, this rule will execute to download and generate the hg19 reference genome
     output:
@@ -144,12 +130,10 @@ rule download_hg19:
     rm *.fa
 
     """
-```
 
-Secondly, we used `bwa` to index the hg19 reference genome. The option `-a bwtsw`   
-*Note*: This step will take a long time, because we could not specify the threads. The `ìndex` function in `bwa` would only use 1 core at a time, which will take approximately 9 hours to finish the indexing.
-```
+# 2.2 indexing the hg19 reference genome
 rule bwa_index:
+    ### use bwa to index the reference genome
     input:
         genome = 'resources/genome/hg19.ref.fa.gz'
     output:
@@ -162,11 +146,11 @@ rule bwa_index:
     bwa index -p hg19 -a bwtsw {input.genome}
     mv hg19.* {params.outdir}
     """
-```
 
-Thirdly, `bwa` was used again to map the preprocessed reads to the indexed genome.
-```
+
+# 2.3 mapping the reads to the indexed reference genome
 rule map_reads:
+    ### use bwa again for alignment
     input: 
         idx = rules.bwa_index.output,
         link_up = rules.preprocess.input,
@@ -184,28 +168,19 @@ rule map_reads:
         {params.index_ref} {input.R1} {input.R2} > {output} \
         2>{log}
     """
-```
 
-### 2.3 Clean-up
-This step includes sorting the sam files, marking PCR duplicates, de-duplication, and indexing the final bam files.
-*Tools, Packages and Dependencies*
-```
-  - picard=2.18.7
-  - htslib=1.18
-  - samtools=1.18
-  - qualimap=2.2.2d
-```
 
-Before we executing this step, we specified the final output of *Clean-up*.
-```
+########## 3 Clean-up ####################
+"""
+The final output for the clean-up step should be the sorted, marked, and indexed BAM files.
+"""
 rule clean_up:
     input: 
         expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
-```
 
-Firstly, we used `picard` to sort the sam files with coordinate mode. And we removed the unsorted sam files to save space in the operational computer.
-```
+# 3.1 sorting the SAM files
 rule sort_sam: 
+    ### using Picard to sort the sam files 
     input:
         sam = results + '02_alignment/{sample}.unsorted.sam',
         link_up = rules.alignment.input
@@ -221,37 +196,40 @@ rule sort_sam:
         2>{log}
 
     """
-```
 
-Secondly, we marked and removed the PCR duplicates detected by `picard`. Because we did not add the DT tag on our sorted sam files, so we decided to set `CLEAN_DT=false`.
-```
+# 3.2 marking dupicates and de-duplication
 rule de_duplicate:
+    ### using Picard to remove PCR duplicates, and convert SAM file into BAM files
     input: 
         results + '03_clean_up/{sample}/{sample}.sorted.sam'
     output:
-        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+        dedup_bam = results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam',
+        sort_bam = results + '03_clean_up/{sample}/{sample}.sorted.bam'
     log: 'log/de_duplicate/{sample}.log'
     threads:10
     params:
         metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
     shell: """
+
     picard MarkDuplicates \
         INPUT={input} \
-        OUTPUT={output} \
+        OUTPUT={output.dedup_bam} \
         METRICS_FILE={params.metrix_file} \
         REMOVE_DUPLICATES=true \
         ASSUME_SORT_ORDER=coordinate \
         CLEAR_DT=false \
         2>{log}
     
-    rm {input}
-    """
-```
+    samtools view -bo {output.sort_bam} {input}
+    qualimap bamqc -bam {output.sort_bam} --java-mem-size=4G
 
-Thirdly, we use `samtools` to show the clean-up stats and to index the bam files. The clean-up stats will be saved to the log file named with the sample names.
-```
+    """
+
+
+# 3.3 indexing the BAM files
 rule index_bam:
+    ### using samtools to show the stats of the sorted and deduplicates outputs and to index the bam files
     input:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
@@ -263,8 +241,81 @@ rule index_bam:
     samtools flagstat {input} | tee {log}
 
     samtools index -@ {threads} -o {output} {input}
-    """
-```
-Also, if required, we used `qualimap` to generate the stats of the BAM files: `qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G`.
 
-### 2.4 Relative copy number profile
+    qualimap bamqc -bam {input} --java-mem-size=4G
+
+    """
+
+
+
+# to test the quality of the BAM files: using qualimap
+# qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G
+
+
+########## 4 ichorCNA ####################
+rule CNA_profile:
+    input:
+        expand(results + '04_ichorCNA/{sample}/{sample}.cna.seg', sample=sample_df.sample_name)
+
+# 4.1 use HMMcopy to generate the WIG file
+rule readCount_WIG:
+    input:
+        link_up = rules.clean_up.input,
+        bam = results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    output:
+        results + '04_ichorCNA/{sample}/{sample}.wig'
+    log: 'log/hmmcopy/{sample}.log'
+    threads: 5
+    params:
+        window = config['hmm_window'],
+        quality = config['hmm_quality']
+    conda: 'envs/ichorCNA.yaml'
+    shell: """
+    readCounter --window {params.window} --quality {params.quality} \
+        --chromosome "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X" \
+        {input.bam} > {output} 2>{log} 
+    """
+
+# 4.2 use ichorCNA to generate copy number profile
+rule ichorCNA:
+    input:
+        sample_wig = results + '04_ichorCNA/{sample}/{sample}.wig',
+        gcWig = config['ichorCNA_settings']['gcWig'],
+        mapWig = config['ichorCNA_settings']['mapWig'],
+        centromere = config['ichorCNA_settings']['centromere'],
+        normalPanels = config['ichorCNA_settings']['normalPanels']
+    output:
+        results+'04_ichorCNA/{sample}/{sample}.cna.seg'
+    log: 'log/ichorCNA/{sample}.log'
+    threads: 32
+    params:
+        runIchorCNA = config['ichorCNA_settings']['ichorCNA_script'],
+        id = '{sample}',
+        ploidy = config['ichorCNA_settings']['ploidy'],
+        maxCN = config['ichorCNA_settings']['maxCN'],
+        normal = config['ichorCNA_settings']['normal'],
+        txnE = config['ichorCNA_settings']['txnE'],
+        txnStrength = config['ichorCNA_settings']['txnStrength'],
+        scStates = config['ichorCNA_settings']['scStates'],
+        includeHOMD = config['ichorCNA_settings']['includeHOMD'],
+        chrs = config['ichorCNA_settings']['chrs'],
+        chrTrain = config['ichorCNA_settings']['chrTrain'],
+        estimateNormal = config['ichorCNA_settings']['estimateNormal'],
+        estimateScPrevalence = config['ichorCNA_settings']['estimateScPrevalence'],
+        estimatePloidy = config['ichorCNA_settings']['estimatePloidy'],
+        normalizeMaleX = config['ichorCNA_settings']['normalizeMaleX'],
+        outdir = results + '04_ichorCNA/{sample}/'
+    conda: 'envs/ichorCNA.yaml'
+    shell: """
+    Rscript {params.runIchorCNA} --id {params.id} \
+        --WIG {input.sample_wig} --ploidy {params.ploidy} --normal {params.normal} --maxCN {params.maxCN} \
+        --gcWig {input.gcWig} \
+        --mapWig {input.mapWig} \
+        --centromere {input.centromere} \
+        --normalPanel {input.normalPanel} \
+        --includeHOMD {params.includeHOMD} --chrs {params.chrs} --chrTrain {params.chrTrain} \
+        --estimateNormal {parmas.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateScPrevalence {params.estimateScPrevalence} \
+        --scStates {params.scStates} --normalizeMaleX {params.normalizeMaleX} \
+        --txnE {params.txnE} --txnStrength {params.txnStrength} --outDir {params.outdir} \
+        2>{log}
+    """

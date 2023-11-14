@@ -1,11 +1,12 @@
 name: ichorCNA
 
 channels:
- - conda-forge
- - bioconda
- - r
- - defaults
+  - conda-forge
+  - bioconda
+  - r
+  - defaults
 
 dependencies:
- - r=4.3
- - r-ichorcna=0.5.0
+  - r=4.3
+  - r-ichorcna=0.5.0
+  - hmmcopy=0.1.1
