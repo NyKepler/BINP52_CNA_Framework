@@ -21,7 +21,7 @@ For example: archive (pre-diagnosis), diagnosis, tumor tissue.
 """
 rule all:
     input:
-        expand(results + '04_ichorCNA/{sample}/{sample}.cna.seg', sample=sample_df.sample_name)
+        expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 
 
 ########## 1 Preprocessing ####################
@@ -250,72 +250,3 @@ rule index_bam:
 
 # to test the quality of the BAM files: using qualimap
 # qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G
-
-
-########## 4 ichorCNA ####################
-rule CNA_profile:
-    input:
-        expand(results + '04_ichorCNA/{sample}/{sample}.cna.seg', sample=sample_df.sample_name)
-
-# 4.1 use HMMcopy to generate the WIG file
-rule readCount_WIG:
-    input:
-        link_up = rules.clean_up.input,
-        bam = results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
-    output:
-        results + '04_ichorCNA/{sample}/{sample}.wig'
-    log: 'log/hmmcopy/{sample}.log'
-    threads: 5
-    params:
-        window = config['hmm_window'],
-        quality = config['hmm_quality']
-    conda: 'envs/ichorCNA.yaml'
-    shell: """
-    readCounter --window {params.window} --quality {params.quality} \
-        --chromosome "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X" \
-        {input.bam} > {output} 2>{log} 
-    """
-
-# 4.2 use ichorCNA to generate copy number profile
-rule ichorCNA:
-    input:
-        sample_wig = results + '04_ichorCNA/{sample}/{sample}.wig',
-        gcWig = config['ichorCNA_settings']['gcWig'],
-        mapWig = config['ichorCNA_settings']['mapWig'],
-        centromere = config['ichorCNA_settings']['centromere'],
-        normalPanels = config['ichorCNA_settings']['normalPanels']
-    output:
-        results+'04_ichorCNA/{sample}/{sample}.cna.seg'
-    log: 'log/ichorCNA/{sample}.log'
-    threads: 32
-    params:
-        runIchorCNA = config['ichorCNA_settings']['ichorCNA_script'],
-        id = '{sample}',
-        ploidy = config['ichorCNA_settings']['ploidy'],
-        maxCN = config['ichorCNA_settings']['maxCN'],
-        normal = config['ichorCNA_settings']['normal'],
-        txnE = config['ichorCNA_settings']['txnE'],
-        txnStrength = config['ichorCNA_settings']['txnStrength'],
-        scStates = config['ichorCNA_settings']['scStates'],
-        includeHOMD = config['ichorCNA_settings']['includeHOMD'],
-        chrs = config['ichorCNA_settings']['chrs'],
-        chrTrain = config['ichorCNA_settings']['chrTrain'],
-        estimateNormal = config['ichorCNA_settings']['estimateNormal'],
-        estimateScPrevalence = config['ichorCNA_settings']['estimateScPrevalence'],
-        estimatePloidy = config['ichorCNA_settings']['estimatePloidy'],
-        normalizeMaleX = config['ichorCNA_settings']['normalizeMaleX'],
-        outdir = results + '04_ichorCNA/{sample}/'
-    conda: 'envs/ichorCNA.yaml'
-    shell: """
-    Rscript {params.runIchorCNA} --id {params.id} \
-        --WIG {input.sample_wig} --ploidy {params.ploidy} --normal {params.normal} --maxCN {params.maxCN} \
-        --gcWig {input.gcWig} \
-        --mapWig {input.mapWig} \
-        --centromere {input.centromere} \
-        --normalPanel {input.normalPanel} \
-        --includeHOMD {params.includeHOMD} --chrs {params.chrs} --chrTrain {params.chrTrain} \
-        --estimateNormal {parmas.estimateNormal} --estimatePloidy {params.estimatePloidy} --estimateScPrevalence {params.estimateScPrevalence} \
-        --scStates {params.scStates} --normalizeMaleX {params.normalizeMaleX} \
-        --txnE {params.txnE} --txnStrength {params.txnStrength} --outDir {params.outdir} \
-        2>{log}
-    """

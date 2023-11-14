@@ -147,7 +147,7 @@ rule bwa_index:
     params: outdir = 'resources/genome/'
     threads: 10
     shell: """
-    bwa index -p hg19 -a bwtsw {input.genome}
+    bwa index -p hg19 -a bwtsw {input.genome} 2>{log}
     mv hg19.* {params.outdir}
     """
 
