@@ -1,9 +1,13 @@
+# Title: Snakefile_draft.smk
+# Author: Guyuan TANG
+# Date: 2023/10/16 - 
+
 import pandas as pd
 
 # specify the configuration file
 configfile: "config/config.yaml"
 
-# specify the samples
+# specify the samples and their groups
 sample_df = (pd.read_csv(config['samples'], 
     sep='\t', 
     dtype={'sample_name':str, 'patient':str, 'fastq_1':str, 'fastq_2':str})
@@ -21,7 +25,7 @@ For example: archive (pre-diagnosis), diagnosis, tumor tissue.
 """
 rule all:
     input:
-        expand(results + '04_relative_CN/{sample}/{sample}.seg.tsv', sample=sample_df.sample_name)
+        expand(results + '05_absolute_CN/{sample}/{sample}.solution.csv', sample=sample_df.sample_name)
 
 
 ########## 1 Preprocessing ####################
@@ -143,7 +147,7 @@ rule bwa_index:
     params: outdir = 'resources/genome/'
     threads: 10
     shell: """
-    bwa index -p hg19 -a bwtsw {input.genome} 2>{log}
+    bwa index -p hg19 -a bwtsw {input.genome}
     mv hg19.* {params.outdir}
     """
 
@@ -203,33 +207,29 @@ rule de_duplicate:
     input: 
         results + '03_clean_up/{sample}/{sample}.sorted.sam'
     output:
-        dedup_bam = results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam',
-        sort_bam = results + '03_clean_up/{sample}/{sample}.sorted.bam'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
     threads:10
     params:
         metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
     shell: """
-
     picard MarkDuplicates \
         INPUT={input} \
-        OUTPUT={output.dedup_bam} \
+        OUTPUT={output} \
         METRICS_FILE={params.metrix_file} \
         REMOVE_DUPLICATES=true \
         ASSUME_SORT_ORDER=coordinate \
         CLEAR_DT=false \
         2>{log}
     
-    samtools view -bo {output.sort_bam} {input}
-    qualimap bamqc -bam {output.sort_bam} --java-mem-size=4G
-
+    rm {input}
     """
 
 
 # 3.3 indexing the BAM files
 rule index_bam:
-    ### using samtools to show the stats of the sorted and deduplicates outputs and to index the bam files
+    ### using samtools to show the stats of the sorted and deduplicates outputs and to index the BAM files
     input:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
@@ -241,16 +241,10 @@ rule index_bam:
     samtools flagstat {input} | tee {log}
 
     samtools index -@ {threads} -o {output} {input}
-
-    qualimap bamqc -bam {input} --java-mem-size=4G
-
     """
-
-
 
 # to test the quality of the BAM files: using qualimap
 # qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G
-
 
 ########## 4 Relative CN profile ####################
 """
@@ -260,7 +254,7 @@ rule relative_CN:
     input:
         rds = expand(results + '04_relative_CN/{sample}/{sample}.rds', sample=sample_df.sample_name),
         tsv = expand(results + '04_relative_CN/{sample}/{sample}.seg.tsv', sample=sample_df.sample_name)
-
+    
 # 4.1 generating relative CN profile
 rule QDNAseq:
     ### QDNAseq will be applied to generate relative copy number profile stored in RDS and tsv files for later analyses.
@@ -278,3 +272,42 @@ rule QDNAseq:
     threads: 10
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
+
+
+########## 5 Absolute CN profile ####################
+"""
+The final output for this step and also the workflow would be the absolute copy number (CN) profile.
+"""
+rule absolute_CN:
+    input:
+        tsv = results + '05_absoluteCN/{sample}.absoluteCN.tsv'
+
+# 5.1 setting up the conda environment with rascal package downloaded from github
+rule rascal_env:
+    input: rules.relative_CN.input
+    output:
+        results + "other_info/rascal_settle_info.txt"
+    conda: 'envs/rascal.yaml'
+    script: 'scripts/rascal_env.R'
+
+
+# 5.2 generating absolute copy number profiles based on the optimal solutions
+rule rascal_absoluteCN:
+    input:
+        rds = results + '04_relative_CN/{sample}.rds',
+        env_set = results + "other_info/rascal_settle_info.txt"
+    output:
+        solution = results + '05_absolute_CN/{sample}.solution.csv',
+        solution_best = results + '05_absolute_CN/{sample}.best_solution.csv',
+        absolute_CN = results + '05_absolute_CN/{sample}.absoluteCN.csv'
+        absolute_CN_seg = results + '05_absolute_CN/{sample}.absoluteCN.seg.csv'
+    params:
+        output_prefix = results + '05_absolute_CN/{sample}'
+    threads:
+    conda: 'envs/rascal.yaml'
+    shell: '''
+    Rscript /workflow/scripts/fit_absoluteCN.R -i {input.rds} -o {params.output_prefix} 
+    '''
+
+
+
