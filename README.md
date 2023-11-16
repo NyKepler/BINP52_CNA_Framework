@@ -11,10 +11,13 @@ The `Snakemake (v7.32.4)` pipeline will include steps from preprocessing raw rea
 #### Steps
 The version of tools and packages to be used will be specified in each step (see chapter 2). The scripts within the pipeline are based on `Python (v3.11.6)` and `R (v4.3.1)`.
 - (1) Preprocessing. This step includes quality assessment and quality trimming on the raw reads. (`Fastp` will be used for QC and trimming, together with `fastqc` and `multiQC` to generate the QC reports.)
-- (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment. Or `BWA-MEM2`)
+- (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment.)
 - (3) Clean-up. After alignment, the SAM files will be sorted and the PCR duplicates will be marked and removed. Also, the .sorted.deduplicated.sam will be converted to BAM files. The BAM files will be indexed for later analysis. (`Picard` will be used for sorting SAM, marking duplicates, removing duplicates and converting SAM to BAM. `samtools` will be used for generating the clean_up stats and for indexing the BAM files.)
 - (4) Relative copy number profile. The BAM files will be analyzed through fixed-size binning, filtering, correction, normalization to generate the read counts per bin. This data will then used for segmentation of bins and generating the relative copy number profile. (`QDNAseq` will be used for this step.)
-- (5) Absolute copy number profile. The output file from `QDNAseq` contains relative copy number, and we need to estimate ploidy and cellularity in our samples to generate our final absolute copy number profile for comparison. (`Rascal` will be used for this step.)
+- (5) Ploidy and cellularity solutions. The output file from `QDNAseq` contains relative copy number, and we need to estimate ploidy and cellularity in our samples to generate our final absolute copy number profile for comparison. (`Rascal` will be used for this step to find the solutions that best fit our study samples.)
+- (6) Absolute copy number profile. We will further use other information (such as TP53 allele frequency) inferring the tumour fraction to select the best ploidy and cellularity solution. We apply this best solution to our relative copy number profile, and generate the final absolute copy number profile for each sample. (`Rascal` will be used for this step.)
+- (7) Comparison with the pan-cancer signatures.
+- (8) Comparison with the recent HGSC signatures.
 
 ## 2. Workflow Details
 ### 2.0 Sample tables generation
@@ -268,3 +271,35 @@ rule index_bam:
 Also, if required, we used `qualimap` to generate the stats of the BAM files: `qualimap bamqc -bam results/03_clean_up/{sample}/{sample}.sorted.dedup.bam --java-mem-size=4G`.
 
 ### 2.4 Relative copy number profile
+This step includes fix-sized binning, filtering, normalization, smoothening, and segmentation on the reads counts from our samples.  
+*Tools, Packages and Dependencies*
+```
+  - bioconductor-qdnaseq=1.36.0
+  - bioconductor-qdnaseq.hg19=1.30.0
+```
+Before we executing this step, we specified the final output of *relative_CN*.
+```
+rule relative_CN:
+    input:
+        rds = expand(results + '04_relative_CN/{sample}/{sample}.rds', sample=sample_df.sample_name),
+        tsv = expand(results + '04_relative_CN/{sample}/{sample}.seg.tsv', sample=sample_df.sample_name)
+```
+The main script for finishing this step can be found as `scripts/runQDNAseq.R`. And the snakemake rule only describes the inputs, outputs, and required parameters.
+```
+rule QDNAseq:
+    input:
+        link_up = rules.clean_up.input,
+        bamfile = results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    output:
+        rds = results + '04_relative_CN/{sample}/{sample}.rds',
+        igv = results + '04_relative_CN/{sample}/{sample}.igv',
+        seg_tsv = results + '04_relative_CN/{sample}/{sample}.seg.tsv'
+    params:
+        sample = '{sample}',
+        binsize = config['QDNAseq']['binsize'],
+        outdir = results + '04_relative_CN/{sample}/'
+    threads: 10
+    conda: 'envs/QDNAseq.yaml'
+    script: 'scripts/runQDNAseq.R'
+```
+
