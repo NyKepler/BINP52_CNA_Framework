@@ -274,39 +274,37 @@ rule QDNAseq:
     script: 'scripts/runQDNAseq.R'
 
 
-########## 5 Absolute CN profile ####################
+########## 5 Ploidy and cellularity solution ################
 """
-The final output for this step and also the workflow would be the absolute copy number (CN) profile.
+The final output for this step would be the solutions of ploidy and tumour purity for each sample. It is also the last step in the first snakemake file (Snakefile_solution.smk)
 """
-rule absolute_CN:
+rule CN_solution: # the rule is the same with rule all at this moment
     input:
-        tsv = results + '05_absoluteCN/{sample}.absoluteCN.tsv'
+        expand(results + '05_absolute_CN/{sample}/{sample}.solution.csv', sample=sample_df.sample_name)
 
 # 5.1 setting up the conda environment with rascal package downloaded from github
 rule rascal_env:
-    input: rules.relative_CN.input
     output:
-        results + "other_info/rascal_settle_info.txt"
+        "log/rascal_settle_info.txt"
     conda: 'envs/rascal.yaml'
     script: 'scripts/rascal_env.R'
 
-
-# 5.2 generating absolute copy number profiles based on the optimal solutions
-rule rascal_absoluteCN:
+# 5.2 calculate the optimal solutions (ploidy and cellularity) of the samples
+rule rascal_solution:
+    ### Rascal will be applied to calculate the optimal solutions for further deriving the absolute copy numbers
     input:
-        rds = results + '04_relative_CN/{sample}.rds',
-        env_set = results + "other_info/rascal_settle_info.txt"
+        link_up = rules.relative_CN.input,
+        env_set = 'log/rascal_settle_info.txt',
+        rds = results + '04_relative_CN/{sample}/{sample}.rds'
     output:
-        solution = results + '05_absolute_CN/{sample}.solution.csv',
-        solution_best = results + '05_absolute_CN/{sample}.best_solution.csv',
-        absolute_CN = results + '05_absolute_CN/{sample}.absoluteCN.csv'
-        absolute_CN_seg = results + '05_absolute_CN/{sample}.absoluteCN.seg.csv'
+        solution = results + '05_absolute_CN/{sample}/{sample}.solution.csv'
     params:
-        output_prefix = results + '05_absolute_CN/{sample}'
-    threads:
+        output_prefix = results + '05_absolute_CN/{sample}/{sample}',
+        script = 'workflow/scripts/fit_CN_solution.R'
+    threads: 10
     conda: 'envs/rascal.yaml'
     shell: '''
-    Rscript /workflow/scripts/fit_absoluteCN.R -i {input.rds} -o {params.output_prefix} 
+    Rscript {params.script} -i {input.rds} -o {params.output_prefix}
     '''
 
 

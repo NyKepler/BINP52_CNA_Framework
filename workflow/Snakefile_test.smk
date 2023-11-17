@@ -21,7 +21,7 @@ For example: archive (pre-diagnosis), diagnosis, tumor tissue.
 """
 rule all:
     input:
-        expand(results + '04_relative_CN/{sample}/{sample}.seg.tsv', sample=sample_df.sample_name)
+        expand(results + '05_absolute_CN/{sample}/{sample}.solution.csv', sample=sample_df.sample_name)
 
 
 ########## 1 Preprocessing ####################
@@ -278,3 +278,38 @@ rule QDNAseq:
     threads: 10
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
+
+
+
+########## 5 Ploidy and cellularity solution ################
+"""
+The final output for this step would be the solutions of ploidy and tumour purity for each sample. It is also the last step in the first snakemake file (Snakefile_solution.smk)
+"""
+rule CN_solution: # the rule is the same with rule all at this moment
+    input:
+        expand(results + '05_absolute_CN/{sample}/{sample}.solution.csv', sample=sample_df.sample_name)
+
+# 5.1 setting up the conda environment with rascal package downloaded from github
+rule rascal_env:
+    output:
+        "log/rascal_settle_info.txt"
+    conda: 'envs/rascal.yaml'
+    script: 'scripts/rascal_env.R'
+
+# 5.2 calculate the optimal solutions (ploidy and cellularity) of the samples
+rule rascal_solution:
+    ### Rascal will be applied to calculate the optimal solutions for further deriving the absolute copy numbers
+    input:
+        link_up = rules.relative_CN.input,
+        env_set = 'log/rascal_settle_info.txt',
+        rds = results + '04_relative_CN/{sample}/{sample}.rds'
+    output:
+        solution = results + '05_absolute_CN/{sample}/{sample}.solution.csv'
+    params:
+        output_prefix = results + '05_absolute_CN/{sample}/{sample}',
+        script = 'workflow/scripts/fit_CN_solution.R'
+    threads: 10
+    conda: 'envs/rascal.yaml'
+    shell: '''
+    Rscript {params.script} -i {input.rds} -o {params.output_prefix}
+    '''

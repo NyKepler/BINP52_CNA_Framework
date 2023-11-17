@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript
+
 # Title: runQDNAseq.R
 # Author: Guyuan TANG
 # Date: 2023/11/16

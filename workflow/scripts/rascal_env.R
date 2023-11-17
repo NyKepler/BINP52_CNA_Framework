@@ -2,8 +2,7 @@
 
 library(devtools)
 
+sink(file = snakemake@output[[1]])
 install_github("crukci-bioinformatics/rascal")
-
-sink(file = "other_info/rascal_settle_info.txt")
 print("build-up rascal package and environment")
 sink(file = NULL)
