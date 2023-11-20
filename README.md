@@ -149,7 +149,7 @@ rule download_hg19:
     """
 ```
 
-Secondly, we used `bwa` to index the hg19 reference genome. The option `-a bwtsw`   
+Secondly, we used `bwa` to index the hg19 reference genome. The option `-a bwtsw` is specifically used on human whole genome   
 *Note*: This step will take a long time, because we could not specify the threads. The `ìndex` function in `bwa` would only use 1 core at a time, which will take approximately 9 hours to finish the indexing.
 ```
 rule bwa_index:
