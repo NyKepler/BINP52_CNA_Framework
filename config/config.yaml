@@ -5,16 +5,26 @@
 
 
 # specify the sample list to be used
-samples: 'config/Tumor.sample.tsv'
+samples: 'config/MaNiLaVS.sample.tsv'
 # specify the sample type
-type: 'Tumor'
+type: 'MaNiLaVS'
 
 # specify the name of the output directory (Please remember to add the '/' at the end!)
-outputdir: 'tumor_results/'
+outputdir: 'MaNiLaVS_results/'
 
 
 bwa_mapping:
   threads: 32
+
+
+# QDNAseq setting (binsize could be selected from 15, 30, 50, 100,etc., the unit should be kbp)
+QDNAseq:
+  binsize: 15
+
+
+# Rascal setting (min cellularity and other settings)
+Rascal:
+  min_cellularity: 0
 
 
 ####### HMMcopy settings #######
@@ -59,12 +69,12 @@ ichorCNA_settings:
   ## specify chromosomes to estimate parameters
   chrTrain: c(1:22,\"X\")
   ## estimate normal
-  estimateNormal: 'True'
+  estimateNormal: True
   ## estimate subclonal prevalence
-  estimateScPrevalence: 'True'
+  estimateScPrevalence: True
   ## estimate tumour ploidy
-  estimatePloidy: 'True'
+  estimatePloidy: True
   ## normalize chrX by median if the sample is male
-  normalizeMaleX: 'False'
+  normalizeMaleX: False
 
 

@@ -303,3 +303,49 @@ rule QDNAseq:
     script: 'scripts/runQDNAseq.R'
 ```
 
+### 2.5 Ploidy and cellularity solutions
+This step uses Rascal package to calculate the optimal solutions of ploidy and cellularity for each sample. This is also the last step of the `Snakefile_solution.smk`.  
+*Tools, Packages and Dependencies*
+```
+ - r-base
+ - r-devtools=2.4.5
+ - r-ggplot2=3.4.4
+ - r-dplyr=1.1.3
+ - r-tidyverse=2.0.0
+ - r-readr=2.1.4
+```
+Before we executing this step, we specified the final output of CN_solutions.
+```
+rule CN_solution: # the rule is the same with rule all at this moment
+    input:
+        expand(results + '05_absolute_CN/{sample}/{sample}.solution.csv', sample=sample_df.sample_name)
+```
+
+Firstly, we need to set the environment and download the rascal package from github. If the environment was settled, we would test it and output a log file.
+```
+rule rascal_env:
+    output:
+        "log/rascal_settle_info.txt"
+    conda: 'envs/rascal.yaml'
+    script: 'scripts/rascal_env.R'
+```
+
+Secondly, we used rascal to calculate the optimal solutions (ploidy and cellularity) of the samples.
+```
+rule rascal_solution:
+    input:
+        link_up = rules.relative_CN.input,
+        env_set = 'log/rascal_settle_info.txt',
+        rds = results + '04_relative_CN/{sample}/{sample}.rds'
+    output:
+        solution = results + '05_absolute_CN/{sample}/{sample}.solution.csv'
+    params:
+        output_prefix = results + '05_absolute_CN/{sample}/{sample}',
+        min_cellularity = config['Rascal']['min_cellularity'],
+        script = 'workflow/scripts/fit_CN_solution.R'
+    threads: 10
+    conda: 'envs/rascal.yaml'
+    shell: '''
+    Rscript {params.script} -i {input.rds} -o {params.output_prefix} --min-cellularity {params.min_cellularity}
+    '''
+```

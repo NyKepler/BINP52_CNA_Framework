@@ -307,9 +307,10 @@ rule rascal_solution:
         solution = results + '05_absolute_CN/{sample}/{sample}.solution.csv'
     params:
         output_prefix = results + '05_absolute_CN/{sample}/{sample}',
+        min_cellularity = config['Rascal']['min_cellularity'],
         script = 'workflow/scripts/fit_CN_solution.R'
     threads: 10
     conda: 'envs/rascal.yaml'
     shell: '''
-    Rscript {params.script} -i {input.rds} -o {params.output_prefix}
+    Rscript {params.script} -i {input.rds} -o {params.output_prefix} --min-cellularity {params.min_cellularity}
     '''
