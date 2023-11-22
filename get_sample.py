@@ -54,23 +54,25 @@ def sample_list(in_table, in_seq_dir, out_dir):
                 sample_name = getattr(line, 'Library')
                 patient = getattr(line, 'Patient')
                 
-                # generate the search patterns
-                R1 = in_seq_dir + sample_name + '_*_R1_*.fastq.gz'
-                R2 = in_seq_dir + sample_name + '_*_R2_*.fastq.gz'
-                # get the path of the corresponding fastq files
-                R1 = glob.glob(R1)[0]
-                R2 = glob.glob(R2)[0]
+                for in_dir in in_seq_dir:
+                    # generate the search patterns
+                    R1 = in_dir + sample_name + '_*R1_*.fastq.gz'
+                    R2 = in_dir + sample_name + '_*R2_*.fastq.gz'
+                    
+                    if glob.glob(R1) and glob.glob(R2): # to identify if the sample is in the directory
+                        # get the path of the corresponding fastq files
+                        R1 = glob.glob(R1)[0]
+                        R2 = glob.glob(R2)[0]
 
-                # print the information
-                print('{}\t{}\t{}\t{}'.format(sample_name,patient,R1,R2), file = out_file)
-
+                        # print the information
+                        print('{}\t{}\t{}\t{}'.format(sample_name,patient,R1,R2), file = out_file)
 
 
 
 
 # Recognize and take in all the input information
 if len(sys.argv) == 2 and sys.argv[1] == '--help':
-    print("\nUsage should be: Python get_sample.py --input [input_xlsx] --data [input_sequence_directory] --output [output_directory]\n")
+    print("\nUsage should be: Python get_sample.py --input [input_xlsx] --data [input_sequence_directory, separated by comma if there are multiple input directories] --output [output_directory]\n")
 
 elif ("--input" in sys.argv) and ("--data" in sys.argv) and ("--output" in sys.argv):
     # take in the input xlsx table
@@ -79,9 +81,10 @@ elif ("--input" in sys.argv) and ("--data" in sys.argv) and ("--output" in sys.a
 
     # take in the directory storing the sequences
     in_seq_loc = sys.argv.index("--data") + 1
-    in_seq_dir = sys.argv[in_seq_loc]
-    if in_seq_dir[-1] != '/':
-        in_seq_dir = in_seq_dir + '/'
+    in_seq_dir = sys.argv[in_seq_loc].split(',')
+    for a in range(0, len(in_seq_dir)):
+        if in_seq_dir[a][-1] != '/':
+            in_seq_dir[a] = in_seq_dir[a] + '/'
 
     # take in the directory to store the output sample tsv files
     out_loc = sys.argv.index("--output") + 1
@@ -92,7 +95,12 @@ elif ("--input" in sys.argv) and ("--data" in sys.argv) and ("--output" in sys.a
 # Main script
     try:
         # to check whether the input files and directories are in correct type
-        if os.path.isfile(in_table) and os.path.isdir(in_seq_dir) and os.path.isdir(out_dir):
+        is_seq_dir = True
+        for a in in_seq_dir:
+            if not os.path.isdir(a):
+                is_seq_dir = False
+
+        if os.path.isfile(in_table) and os.path.isdir(out_dir) and is_seq_dir:
             # run the main function
             sample_list(in_table, in_seq_dir, out_dir)
 
@@ -103,4 +111,3 @@ elif ("--input" in sys.argv) and ("--data" in sys.argv) and ("--output" in sys.a
     except FileNotFoundError as not_found:
         print("The file {} was not found!".format(not_found.filename))
     
-
