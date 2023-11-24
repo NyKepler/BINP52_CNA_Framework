@@ -47,7 +47,7 @@ rule fastp:
         html = results + '01_preprocess/html/{sample}_fastp.html',
         R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     log: 'log/fastp/{sample}_fastp.log'
-    threads: 10
+    threads: 20
     params: json = results + '01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
@@ -76,7 +76,7 @@ rule fastqc:
     params: 
         outdir = results + '01_preprocess/reports/',
         out_html = results + '01_preprocess/html/'
-    threads: 10
+    threads: 20
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
@@ -269,7 +269,7 @@ rule QDNAseq:
         sample = '{sample}',
         binsize = config['QDNAseq']['binsize'],
         outdir = results + '04_relative_CN/{sample}/'
-    threads: 10
+    threads: 20
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
 
@@ -302,7 +302,7 @@ rule rascal_solution:
         output_prefix = results + '05_absolute_CN/{sample}/{sample}',
         min_cellularity = config['Rascal']['min_cellularity'],
         script = 'workflow/scripts/fit_CN_solution.R'
-    threads: 10
+    threads: 20
     conda: 'envs/rascal.yaml'
     shell: '''
     Rscript {params.script} -i {input.rds} -o {params.output_prefix} --min-cellularity {params.min_cellularity}

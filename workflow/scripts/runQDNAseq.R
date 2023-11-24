@@ -1,5 +1,3 @@
-#!/usr/bin/env Rscript
-
 # Title: runQDNAseq.R
 # Author: Guyuan TANG
 # Date: 2023/11/16
@@ -21,7 +19,8 @@ sample_name <- snakemake@params[['sample']]
 outdir <- snakemake@params[['outdir']]
 
 # set the fixed bin size
-bins <- getBinAnnotations(binSize = snakemake@params[['binsize']])
+binSize <- snakemake@params[['binsize']]
+bins <- readRDS(file = paste0("resources/BinAnnotatins/hg19_PE100.", binSize, "kb.rds"))
 
 # read the BAM file and derive raw counts per bin
 readCounts <- binReadCounts(bins, bamfiles = snakemake@input[['bamfile']])
@@ -62,7 +61,6 @@ dev.off()
 # export the final segmented bins
 exportBins(copyNumbers_Segmented, file = snakemake@output[['seg_tsv']], format = 'tsv', type = 'segments', logTransform = FALSE)
 saveRDS(copyNumbers_Segmented, file = snakemake@output[['rds']], compress = FALSE)
-
 
 
 
