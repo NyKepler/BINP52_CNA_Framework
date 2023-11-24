@@ -131,7 +131,7 @@ rule download_hg19:
 
     gzip resources/genome/hg19.ref.fa
 
-    rm *.fa
+    rm resources/genome/*.fa
 
     """
 
@@ -145,7 +145,7 @@ rule bwa_index:
     conda: 'envs/alignment.yaml'
     log: 'log/bwa/bwa_index.log'
     params: outdir = 'resources/genome/'
-    threads: 10
+    threads: 20
     shell: """
     bwa index -p hg19 -a bwtsw {input.genome}
     mv hg19.* {params.outdir}
@@ -209,7 +209,7 @@ rule de_duplicate:
     output:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     log: 'log/de_duplicate/{sample}.log'
-    threads:10
+    threads:20
     params:
         metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
     conda: 'envs/clean_up.yaml'
@@ -234,8 +234,8 @@ rule index_bam:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
     output:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai'
-    log: 'log/bam_stat/{sample}.log'
-    threads: 10
+    log: 'log/bam_stat/' + sample_group + '/{sample}.log'
+    threads: 20
     conda: 'envs/clean_up.yaml'
     shell: """
     samtools flagstat {input} | tee {log}
