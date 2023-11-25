@@ -137,7 +137,9 @@ for (sample_index in 1:number_of_samples) {
   
   message(sample_index, "/", number_of_samples, " ", sample, " ", nrow(solutions))
   
-  if (nrow(solutions) == 0) next
+  if (nrow(solutions) == 0) {
+    solutions <- tibble(sample = sample, ploidy = 0, cellularity = 0, distance = 0)
+  }
   
   solutions <- solutions %>%
     transmute(sample = sample, ploidy, cellularity, distance)
