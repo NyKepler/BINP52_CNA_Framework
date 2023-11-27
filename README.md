@@ -218,7 +218,7 @@ rule sort_sam_dedup:
         sort_sam = 'log/sort_sam/{sample}.log',
         de_duplicate = 'log/de_duplicate/{sample}.log'
     conda: 'envs/clean_up.yaml'
-    threads: 20
+    threads: 2
     params: 
         metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt',
         sorted_sam = results + '03_clean_up/{sample}/{sample}.sorted.sam'
@@ -251,7 +251,7 @@ rule index_bam:
     output:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/{sample}.log'
-    threads: 10
+    threads: 2
     conda: 'envs/clean_up.yaml'
     shell: """
     samtools flagstat {input} | tee {log}
