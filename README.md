@@ -206,53 +206,44 @@ rule clean_up:
         expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 ```
 
-Firstly, we used `picard` to sort the sam files with coordinate mode. And we removed the unsorted sam files to save space in the operational computer.
+To avoid using out of space in the disk, we combined the steps using `picard` together (sorting the SAM files, marking and removing PCR dupicates). And we removed the unsorted and intermediate SAM files.
 ```
-rule sort_sam: 
+rule sort_sam_dedup: 
+    ### using Picard to sort the sam files, to mark and remove the PCR duplicates, and to convert SAM into BAM
     input:
-        sam = results + '02_alignment/{sample}.unsorted.sam',
-        link_up = rules.alignment.input
+        sam = results + '02_alignment/{sample}.unsorted.sam'
     output:
-        results + '03_clean_up/{sample}/{sample}.sorted.sam'
-    log: 'log/sort_sam/{sample}.log'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    log: 
+        sort_sam = 'log/sort_sam/{sample}.log',
+        de_duplicate = 'log/de_duplicate/{sample}.log'
     conda: 'envs/clean_up.yaml'
+    threads: 20
+    params: 
+        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt',
+        sorted_sam = results + '03_clean_up/{sample}/{sample}.sorted.sam'
     shell: """
     picard SortSam \
         INPUT={input.sam} \
-        OUTPUT={output} \
+        OUTPUT={params.sorted_sam} \
         SORT_ORDER=coordinate \
-        2>{log}
+        2>{log.sort_sam}
+    rm {input.sam}
 
-    """
-```
-
-Secondly, we marked and removed the PCR duplicates detected by `picard`. Because we did not add the DT tag on our sorted sam files, so we decided to set `CLEAN_DT=false`.
-```
-rule de_duplicate:
-    input: 
-        results + '03_clean_up/{sample}/{sample}.sorted.sam'
-    output:
-        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
-    log: 'log/de_duplicate/{sample}.log'
-    threads:10
-    params:
-        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
-    conda: 'envs/clean_up.yaml'
-    shell: """
     picard MarkDuplicates \
-        INPUT={input} \
+        INPUT={params.sorted_sam} \
         OUTPUT={output} \
         METRICS_FILE={params.metrix_file} \
         REMOVE_DUPLICATES=true \
         ASSUME_SORT_ORDER=coordinate \
         CLEAR_DT=false \
-        2>{log}
-    
-    rm {input}
+        2>{log.de_duplicate}
+    rm {params.sorted_sam}
+
     """
 ```
 
-Thirdly, we use `samtools` to show the clean-up stats and to index the bam files. The clean-up stats will be saved to the log file named with the sample names.
+Secondly, we use `samtools` to show the clean-up stats and to index the bam files. The clean-up stats will be saved to the log file named with the sample names.
 ```
 rule index_bam:
     input:

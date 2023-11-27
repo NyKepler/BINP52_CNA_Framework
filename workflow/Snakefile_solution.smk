@@ -183,51 +183,42 @@ rule clean_up:
         expand(results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai', sample=sample_df.sample_name)
 
 # 3.1 sorting the SAM files
-rule sort_sam: 
-    ### using Picard to sort the sam files 
+rule sort_sam_dedup: 
+    ### using Picard to sort the sam files, to mark and remove the PCR duplicates, and to convert SAM into BAM
     input:
-        sam = results + '02_alignment/{sample}.unsorted.sam',
-        link_up = rules.alignment.input
+        sam = results + '02_alignment/{sample}.unsorted.sam'
     output:
-        results + '03_clean_up/{sample}/{sample}.sorted.sam'
-    log: 'log/sort_sam/{sample}.log'
+        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
+    log: 
+        sort_sam = 'log/sort_sam/{sample}.log',
+        de_duplicate = 'log/de_duplicate/{sample}.log'
     conda: 'envs/clean_up.yaml'
+    threads: 20
+    params: 
+        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt',
+        sorted_sam = results + '03_clean_up/{sample}/{sample}.sorted.sam'
     shell: """
     picard SortSam \
         INPUT={input.sam} \
-        OUTPUT={output} \
+        OUTPUT={params.sorted_sam} \
         SORT_ORDER=coordinate \
-        2>{log}
+        2>{log.sort_sam}
+    rm {input.sam}
 
-    """
-
-# 3.2 marking dupicates and de-duplication
-rule de_duplicate:
-    ### using Picard to remove PCR duplicates, and convert SAM file into BAM files
-    input: 
-        results + '03_clean_up/{sample}/{sample}.sorted.sam'
-    output:
-        results + '03_clean_up/{sample}/{sample}.sorted.dedup.bam'
-    log: 'log/de_duplicate/{sample}.log'
-    threads:20
-    params:
-        metrix_file = results + '03_clean_up/{sample}/{sample}.metrics.txt'
-    conda: 'envs/clean_up.yaml'
-    shell: """
     picard MarkDuplicates \
-        INPUT={input} \
+        INPUT={params.sorted_sam} \
         OUTPUT={output} \
         METRICS_FILE={params.metrix_file} \
         REMOVE_DUPLICATES=true \
         ASSUME_SORT_ORDER=coordinate \
         CLEAR_DT=false \
-        2>{log}
-    
-    rm {input}
+        2>{log.de_duplicate}
+    rm {params.sorted_sam}
+
     """
 
 
-# 3.3 indexing the BAM files
+# 3.2 indexing the BAM files
 rule index_bam:
     ### using samtools to show the stats of the sorted and deduplicates outputs and to index the BAM files
     input:
