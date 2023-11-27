@@ -14,7 +14,7 @@ outputdir: 'results/MaNiLaVS/'
 
 
 bwa_mapping:
-  threads: 28
+  threads: 24
 
 
 # method to generate the copy number profiles (either rascal or ichorCNA)
@@ -23,7 +23,7 @@ CN_method: rascal
 
 # QDNAseq setting (binsize could be selected from 15, 30, 50, 100,etc., the unit should be kbp)
 QDNAseq:
-  binsize: 15
+  binsize: 10
 
 
 # Rascal setting (min cellularity and other settings)
