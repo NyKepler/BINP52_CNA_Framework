@@ -226,7 +226,7 @@ rule index_bam:
     output:
         results + '03_clean_up/{sample}/{sample}.sorted.dedup.bai'
     log: 'log/bam_stat/' + sample_group + '/{sample}.log'
-    threads: 2
+    threads: 8
     conda: 'envs/clean_up.yaml'
     shell: """
     samtools flagstat {input} | tee {log}
