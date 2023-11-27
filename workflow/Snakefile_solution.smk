@@ -260,7 +260,7 @@ rule QDNAseq:
         sample = '{sample}',
         binsize = config['QDNAseq']['binsize'],
         outdir = results + '04_relative_CN/{sample}/'
-    threads: 2
+    threads: 10
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
 
@@ -293,7 +293,7 @@ rule rascal_solution:
         output_prefix = results + '05_absolute_CN/{sample}/{sample}',
         min_cellularity = config['Rascal']['min_cellularity'],
         script = 'workflow/scripts/fit_CN_solution.R'
-    threads: 2
+    threads: 10
     conda: 'envs/rascal.yaml'
     shell: '''
     Rscript {params.script} -i {input.rds} -o {params.output_prefix} --min-cellularity {params.min_cellularity}
