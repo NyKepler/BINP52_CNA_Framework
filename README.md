@@ -54,7 +54,7 @@ rule fastp:
         html = results + '01_preprocess/html/{sample}_fastp.html',
         R2 = results + '01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     log: 'log/fastp/{sample}_fastp.log'
-    threads: 10
+    threads: 16
     params: json = results + '01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
@@ -83,7 +83,7 @@ rule fastqc:
     params: 
         outdir = results + '01_preprocess/reports/',
         out_html = results + '01_preprocess/html/'
-    threads: 10
+    threads: 2
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
@@ -160,7 +160,7 @@ rule bwa_index:
     conda: 'envs/alignment.yaml'
     log: 'log/bwa/bwa_index.log'
     params: outdir = 'resources/genome/'
-    threads: 10
+    threads: 20
     shell: """
     bwa index -p hg19 -a bwtsw {input.genome}
     mv hg19.* {params.outdir}

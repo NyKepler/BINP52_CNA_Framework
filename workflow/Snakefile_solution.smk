@@ -76,7 +76,7 @@ rule fastqc:
     params: 
         outdir = results + '01_preprocess/reports/',
         out_html = results + '01_preprocess/html/'
-    threads: 20
+    threads: 2
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
