@@ -75,12 +75,15 @@ rule fastqc:
     log: 'log/fastqc/{sample}.fastqc.log'
     params: 
         outdir = results + '01_preprocess/reports/',
-        out_html = results + '01_preprocess/html/'
+        out_html = results + '01_preprocess/html/',
+        R1_html = results + '01_preprocess/reports/{sample}_R1_preprocess_fastqc.html',
+        R2_html = results + '01_preprocess/reports/{sample}_R2_preprocess_fastqc.html'
     threads: 2
     conda: 'envs/preprocess_env.yaml'
     shell: """
     fastqc -o {params.outdir} {input.R1_seq} {input.R2_seq} 2>{log}
-    mv {params.outdir}*_fastqc.html {params.out_html}
+    mv {params.R1_html} {params.out_html}
+    mv {params.R2_html} {params.out_html}
     """
 
 # 1.3 quality assessment report for the reads
