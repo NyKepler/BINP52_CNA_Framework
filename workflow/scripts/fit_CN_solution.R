@@ -138,7 +138,7 @@ for (sample_index in 1:number_of_samples) {
   message(sample_index, "/", number_of_samples, " ", sample, " ", nrow(solutions))
   
   if (nrow(solutions) == 0) {
-    solutions <- tibble(sample = sample, ploidy = 0, cellularity = 0, distance = 0)
+    solutions <- tibble(sample = sample, ploidy = -1, cellularity = -1, distance = -1)
   }
   
   solutions <- solutions %>%
