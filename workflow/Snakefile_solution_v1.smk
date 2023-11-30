@@ -296,8 +296,8 @@ The final output for this step is the relative copy number (CN) profile generate
 """
 rule relative_CN:
     input:
-        rds = expand(results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.rds', sample=sample_df.sample_name),
-        tsv = expand(results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.seg.tsv', sample=sample_df.sample_name)
+        rds = expand(results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.rds', sample=sample_df.sample_name),
+        tsv = expand(results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.seg.tsv', sample=sample_df.sample_name)
     
 # 4.1 generating relative CN profile
 rule QDNAseq:
@@ -306,13 +306,13 @@ rule QDNAseq:
         link_up = rules.clean_up.input,
         bamfile = results + '{sample}/03_clean_up/{sample}.sorted.dedup.bam'
     output:
-        rds = results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.rds',
-        igv = results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.igv',
-        seg_tsv = results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.seg.tsv'
+        rds = results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.rds',
+        igv = results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.igv',
+        seg_tsv = results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.seg.tsv'
     params:
         sample = '{sample}',
-        binsize = binsize,
-        outdir = results + '{sample}/04_relative_CN/'
+        binsize = config['QDNAseq']['binsize'],
+        outdir = results + '{sample}/04_relative_CN/' + binsize + 'kb/'
     threads: 5
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
@@ -339,7 +339,7 @@ rule rascal_solution:
     input:
         link_up = rules.relative_CN.input,
         env_set = 'log/rascal_settle_info.txt',
-        rds = results + '{sample}/04_relative_CN/{sample}_' + binsize + 'kb.rds'
+        rds = results + '{sample}/04_relative_CN/' + binsize + 'kb/{sample}_' + binsize + 'kb.rds'
     output:
         solution = results + '{sample}/05_absolute_CN/solutions/{sample}_' + binsize + 'kb.solution.csv'
     params:

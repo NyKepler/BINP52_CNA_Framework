@@ -41,31 +41,29 @@ import glob
 # Define a function to extract unique types of samples and search for the corresponding reads 
 def sample_list(in_table, in_seq_dir, out_dir):
     df = pd.read_excel(in_table, header=0)
-    type_list = df['Type'].unique().tolist()
-
-    for t in type_list:
-        out_file = out_dir + t + '.sample.tsv'
-        with open(out_file, 'w') as out_file:
-            # write the header
-            print("sample_name\tpatient\tfastq_1\tfastq_2", file = out_file)
-            # iterate by rows in the df to derive the sample_name and patient
-            df_t = df[df['Type'] == t]
-            for line in df_t.itertuples():
-                sample_name = getattr(line, 'Library')
-                patient = getattr(line, 'Patient')
+    
+    out_file = out_dir + 'All_samples.tsv'
+    with open(out_file, 'w') as out_file:
+        # write the header
+        print("sample_name\tpatient\ttype\tfastq_1\tfastq_2", file = out_file)
+        # iterate by rows in the df to derive the sample_name and patient
+        for line in df.itertuples():
+            sample_name = getattr(line, 'Library')
+            patient = getattr(line, 'Patient')
+            sample_type = getattr(line, 'Type')
                 
-                for in_dir in in_seq_dir:
-                    # generate the search patterns
-                    R1 = in_dir + sample_name + '_*R1_*.fastq.gz'
-                    R2 = in_dir + sample_name + '_*R2_*.fastq.gz'
+            for in_dir in in_seq_dir:
+                # generate the search patterns
+                R1 = in_dir + sample_name + '_*R1_*.fastq.gz'
+                R2 = in_dir + sample_name + '_*R2_*.fastq.gz'
                     
-                    if glob.glob(R1) and glob.glob(R2): # to identify if the sample is in the directory
-                        # get the path of the corresponding fastq files
-                        R1 = glob.glob(R1)[0]
-                        R2 = glob.glob(R2)[0]
+                if glob.glob(R1) and glob.glob(R2): # to identify if the sample is in the directory
+                    # get the path of the corresponding fastq files
+                    R1 = glob.glob(R1)[0]
+                    R2 = glob.glob(R2)[0]
 
-                        # print the information
-                        print('{}\t{}\t{}\t{}'.format(sample_name,patient,R1,R2), file = out_file)
+                    # print the information
+                    print('{}\t{}\t{}\t{}\t{}'.format(sample_name,patient,sample_type,R1,R2), file = out_file)
 
 
 
