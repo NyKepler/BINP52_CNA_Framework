@@ -99,7 +99,7 @@ rule fastp:
         html = results + '{sample}/01_preprocess/html/{sample}_fastp.html',
         R2 = results + '{sample}/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     log: 'log/fastp/{sample}_fastp.log'
-    threads: 16
+    threads: 15
     params: json = results + '{sample}/01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
