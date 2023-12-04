@@ -12,7 +12,7 @@ List of packages/libraries:
     sys, pandas, numpy, os
 
 List of functions:
-    table_generate(sample_table, method, max_solutions), sample_solutions(sample_dir, sample_table, method, max_solutions)
+    table_generate(sample_table, method, max_solutions), sample_solutions(sample_dir, sample_table, method, max_solutions, binsize)
 
 
 Steps:
@@ -36,7 +36,10 @@ import numpy as np
 
 # Define a function to extend columns in the sample table
 def table_generate(sample_table, method, max_solutions, binsize):
-    sample_table['BinSize'] = str(binsize) + 'kb'
+    sample_table['num_reads'] = 0
+    num_solutions = method + str(binsize) + 'kb'
+    sample_table = pd.concat([sample_table,pd.DataFrame(columns=[num_solutions])], sort=False)
+
     for i in range(1, max_solutions+1):
         new_ploidy = method + '_ploidy_' + str(i)
         new_cellularity = method + '_cellularity_' + str(i)
@@ -47,13 +50,28 @@ def table_generate(sample_table, method, max_solutions, binsize):
     return sample_table
 
 
-# Define a function to extract the solutions for each sample from the solution files
-def sample_solutions(sample_dir, sample_table, method, max_solutions):
-    for index,row in sample_table.iterrows():
+# Define a function to extract the number of reads, and solutions for each sample from the solution files
+def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
+    for index in sample_table.index:
         sample_name = index
-        sample_type = row['Type']
-        solution_file = sample_dir + sample_type + '/05_absolute_CN/' + sample_name + '/' + sample_name + '.solution.csv'
+        # to extract the final number of reads
+        bam_stat = sample_dir + sample_name + '/03_clean_up/' + sample_name + 'bamstat.txt'
+        with open(bam_stat, 'r') as bam_stat:
+            # the first line contain the number of reads
+            stat_line = bam_stat.readline()
+            num_reads = stat_line.strip().split(' ')[0]
+            sample_table.loc[index, 'num_reads'] = int(num_reads)
+
+        # to extract the solutions
+        solution_file = sample_dir + sample_name + '/05_absolute_CN/solutions/' + sample_name + '_' + binsize + 'kb.solution.csv'
         solution = pd.read_csv(solution_file, header=0)
+        # change the value in column ploidy, cellularity and MAD into int
+        solution['ploidy'] = solution['ploidy'].apply(pd.to_numeric)
+        solution['cellularity'] = solution['cellularity'].apply(pd.to_numeric)
+        solution['distance'] = solution['distance'].apply(pd.to_numeric)
+
+        num_solution_col = method + str(binsize) + 'kb'
+        sample_table.loc[index, num_solution_col] = solution.shape[0]
         if solution.shape[0] > 0:
             for n in range(solution.shape[0]):
                 # when reach the maximum number of solutions
@@ -67,6 +85,9 @@ def sample_solutions(sample_dir, sample_table, method, max_solutions):
                     sample_table.loc[index, col_ploidy] = solution.loc[n, 'ploidy']
                     sample_table.loc[index, col_cellularity] = solution.loc[n, 'cellularity']
                     sample_table.loc[index, col_MAD] = solution.loc[n, 'distance']
+                    # if there is no solutions (which marked as -1)
+                    if sample_table.loc[index, col_ploidy] == -1:
+                        sample_table.loc[index, num_solution_col] = 0
 
     return sample_table
 
@@ -106,7 +127,7 @@ elif ("--sample-list" in sys.argv) and ("--sample-dir" in sys.argv) and ("--meth
             sample_table = pd.read_excel(sample_table_file, header=0, index_col='Library')
             sample_table = table_generate(sample_table,method,max_solutions, binsize)
             # fill in the solutions for each sample
-            sample_table = sample_solutions(sample_dir,sample_table, method, max_solutions)
+            sample_table = sample_solutions(sample_dir,sample_table, method, max_solutions, binsize)
             # export the final table
             sample_table.to_excel(sample_table_file)
         else:
