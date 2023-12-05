@@ -5,12 +5,10 @@
 
 
 # specify the sample list to be used
-samples: 'config/MaNiLaVS.sample.tsv'
-# specify the sample type
-type: 'MaNiLaVS'
+samples: 'config/All_samples.tsv'
 
 # specify the name of the output directory (Please remember to add the '/' at the end!)
-outputdir: 'results/MaNiLaVS/'
+outputdir: 'results/'
 
 
 bwa_mapping:
@@ -21,9 +19,15 @@ bwa_mapping:
 CN_method: rascal
 
 
-# QDNAseq setting (binsize could be selected from 15, 30, 50, 100,etc., the unit should be kbp)
+# QDNAseq setting (binsize could be selected from 1, 5, 10, 15, 30, 50, 100,etc., the unit should be kb)
 QDNAseq:
-  binsize: 10
+  binsize: 1
+  # the maximum size of data running in R programme (unit: Mb)
+  # for 1kb, it recommends to use at least 2.5 Gb (2560Mb)
+  maxSize: 2560
+  # the number of threads in running QDNAseq, it will matter how many jobs running in parallel in Snakemake pipeline
+  # for binsize <= 15kb, it recommends to operate no more than 2 jobs at a same time to avoid potential errors
+  threads: 30
 
 
 # Rascal setting (min cellularity and other settings)
