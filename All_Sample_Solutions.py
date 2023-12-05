@@ -32,13 +32,14 @@ import sys
 import os
 import pandas as pd
 import numpy as np
+import openpyxl
 
 
 # Define a function to extend columns in the sample table
 def table_generate(sample_table, method, max_solutions, binsize):
     sample_table['num_reads'] = 0
-    num_solutions = method + str(binsize) + 'kb'
-    sample_table = pd.concat([sample_table,pd.DataFrame(columns=[num_solutions])], sort=False)
+    num_solutions = method + '_' + str(binsize) + 'kb_num'
+    sample_table[num_solutions] = 0
 
     for i in range(1, max_solutions+1):
         new_ploidy = method + '_ploidy_' + str(i)
@@ -55,7 +56,7 @@ def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
     for index in sample_table.index:
         sample_name = index
         # to extract the final number of reads
-        bam_stat = sample_dir + sample_name + '/03_clean_up/' + sample_name + 'bamstat.txt'
+        bam_stat = sample_dir + sample_name + '/03_clean_up/' + sample_name + '.bamstat.txt'
         with open(bam_stat, 'r') as bam_stat:
             # the first line contain the number of reads
             stat_line = bam_stat.readline()
@@ -69,8 +70,8 @@ def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
         solution['ploidy'] = solution['ploidy'].apply(pd.to_numeric)
         solution['cellularity'] = solution['cellularity'].apply(pd.to_numeric)
         solution['distance'] = solution['distance'].apply(pd.to_numeric)
-
-        num_solution_col = method + str(binsize) + 'kb'
+        # to extract the number of solutions
+        num_solution_col = method + '_' + str(binsize) + 'kb_num'
         sample_table.loc[index, num_solution_col] = solution.shape[0]
         if solution.shape[0] > 0:
             for n in range(solution.shape[0]):
@@ -115,21 +116,27 @@ elif ("--sample-list" in sys.argv) and ("--sample-dir" in sys.argv) and ("--meth
     # take in the maximum number of solutions
     max_solutions_loc = sys.argv.index("--max-solutions") + 1
     max_solutions = sys.argv[max_solutions_loc]
+    max_solutions = int(max_solutions)
 
     # take in the binsize used in the workflow
     binsize_loc = sys.argv.index("--binsize") + 1
     binsize = sys.argv[binsize_loc]
+    binsize = str(binsize)
 
     try:
         # check the inputs are all in correct forms
         if os.path.isfile(sample_table_file) and os.path.isdir(sample_dir):
             # generate the dataframe from sample table, with sample names as the indices
-            sample_table = pd.read_excel(sample_table_file, header=0, index_col='Library')
+            sample_table = pd.read_excel(sample_table_file, sheet_name='original', header=0, index_col='Library')
             sample_table = table_generate(sample_table,method,max_solutions, binsize)
             # fill in the solutions for each sample
             sample_table = sample_solutions(sample_dir,sample_table, method, max_solutions, binsize)
+            # reset index for better output
+            sample_table = sample_table.reset_index()
+            sample_table.rename(columns={'index':'Library'}, inplace=True)
             # export the final table
-            sample_table.to_excel(sample_table_file)
+            with pd.ExcelWriter(sample_table_file, mode='a', engine='openpyxl') as writer:
+                sample_table.to_excel(writer, sheet_name=method+'_'+binsize+'kb', index=False)
         else:
             print("Please use --help to check the usage again!")
     except FileNotFoundError as not_found:
