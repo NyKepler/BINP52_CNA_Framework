@@ -37,14 +37,16 @@ import openpyxl
 
 # Define a function to extend columns in the sample table
 def table_generate(sample_table, method, max_solutions, binsize):
+    binsize = str(binsize)
     sample_table['num_reads'] = 0
-    num_solutions = method + '_' + str(binsize) + 'kb_num'
+    sample_table['num_segments'] = 0
+    num_solutions = method + '_' + binsize + 'kb_num'
     sample_table[num_solutions] = 0
 
     for i in range(1, max_solutions+1):
-        new_ploidy = method + '_ploidy_' + str(i)
-        new_cellularity = method + '_cellularity_' + str(i)
-        new_MAD = method + '_MAD_' + str(i)
+        new_ploidy = method + '_' + binsize + 'kb_ploidy_' + str(i)
+        new_cellularity = method + '_' + binsize + 'kb_cellularity_' + str(i)
+        new_MAD = method + '_' + binsize + 'kb_MAD_' + str(i)
 
         sample_table = pd.concat([sample_table,pd.DataFrame(columns=[new_ploidy,new_cellularity,new_MAD])], sort=False)
 
@@ -53,6 +55,7 @@ def table_generate(sample_table, method, max_solutions, binsize):
 
 # Define a function to extract the number of reads, and solutions for each sample from the solution files
 def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
+    binsize = str(binsize)
     for index in sample_table.index:
         sample_name = index
         # to extract the final number of reads
@@ -62,6 +65,19 @@ def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
             stat_line = bam_stat.readline()
             num_reads = stat_line.strip().split(' ')[0]
             sample_table.loc[index, 'num_reads'] = int(num_reads)
+        
+        # to calculate the number of segments
+        seg_file = sample_dir + sample_name + '/04_relative_CN/' + binsize + 'kb/' + sample_name + '_' + binsize + 'kb.seg.tsv'
+        segments_df = pd.read_csv(seg_file, sep='\t', header=0)
+        segments = pd.to_numeric(segments_df[sample_name+'.sorted.dedup'])
+        segments = segments.tolist() # store the segment values into a list
+        # start calculating the number of segments
+        num_seg = 0
+        for i in range(0, len(segments)-1): # calculate the number of segment change points
+            if segments[i+1] != segments[i]:
+                num_seg += 1
+        num_seg += 1 # the number of segments
+        sample_table.loc[index, 'num_segments'] = int(num_seg)
 
         # to extract the solutions
         solution_file = sample_dir + sample_name + '/05_absolute_CN/solutions/' + sample_name + '_' + binsize + 'kb.solution.csv'
@@ -79,9 +95,9 @@ def sample_solutions(sample_dir, sample_table, method, max_solutions, binsize):
                 if n >= max_solutions:
                     break
                 else:
-                    col_ploidy = method + '_ploidy_' + str(n+1)
-                    col_cellularity = method + '_cellularity_' + str(n+1)
-                    col_MAD = method + '_MAD_' + str(n+1)
+                    col_ploidy = method + '_' + binsize + 'kb_ploidy_' + str(n+1)
+                    col_cellularity = method + '_' + binsize + 'kb_cellularity_' + str(n+1)
+                    col_MAD = method + '_' + binsize + 'kb_MAD_' + str(n+1)
                     # fill in the data
                     sample_table.loc[index, col_ploidy] = solution.loc[n, 'ploidy']
                     sample_table.loc[index, col_cellularity] = solution.loc[n, 'cellularity']
