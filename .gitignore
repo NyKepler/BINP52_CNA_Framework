@@ -1,3 +1,4 @@
 # the reference genome should be ignored
 resources/genome/hg19.*
 
+results/MaNiLa_All_samplesheet_test.xlsx
