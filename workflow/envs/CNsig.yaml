@@ -8,8 +8,8 @@ channels:
 
 dependencies:
  - r-base
- - r-Biobase=2.62.0
+ - r-biocmanager=1.30.22
  - r-devtools=2.4.5
- - r-NMF=0.26
- - r-flexmix=2.3-19
+ - r-nmf=0.21.0
+ - r-flexmix=2.3_19
  - bioconductor-qdnaseq=1.36.0
