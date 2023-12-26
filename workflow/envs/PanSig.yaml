@@ -1,0 +1,11 @@
+name: PanSig
+
+channels:
+ - conda-forge
+ - bioconda
+ - r
+ - defaults
+
+dependencies:
+ - r-base
+ - r-devtools=2.4.5
