@@ -1,0 +1,19 @@
+name: cnsignatures
+
+channels:
+ - conda-forge
+ - bioconda
+ - r
+ - defaults
+
+dependencies:
+ - r-base
+ - r-Biobase=2.62.0
+ - r-devtools=2.4.5
+ - r-vctrs=0.6.5
+ - r-rlang=1.1.2
+ - r-cli=3.6.2
+ - r-stringi=1.8.3
+ - r-NMF=0.26
+ - r-flexmix=2.3-19
+ - bioconductor-qdnaseq=1.36.0
