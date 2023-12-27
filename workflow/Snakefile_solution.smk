@@ -99,7 +99,7 @@ rule fastp:
         html = results + '{sample}/01_preprocess/html/{sample}_fastp.html',
         R2 = results + '{sample}/01_preprocess/reads/{sample}_R2_preprocess.fastq.gz'
     log: 'log/fastp/{sample}_fastp.log'
-    threads: 15
+    threads: 16
     params: json = results + '{sample}/01_preprocess/html/{sample}_fastp.json'
     conda: "envs/preprocess_env.yaml"
     shell: """
@@ -312,8 +312,9 @@ rule QDNAseq:
     params:
         sample = '{sample}',
         binsize = config['QDNAseq']['binsize'],
-        outdir = results + '{sample}/04_relative_CN/' + binsize + 'kb/'
-    threads: 5
+        outdir = results + '{sample}/04_relative_CN/' + binsize + 'kb/',
+        maxSize = config['QDNAseq']['maxSize']
+    threads: config['QDNAseq']['threads']
     conda: 'envs/QDNAseq.yaml'
     script: 'scripts/runQDNAseq.R'
 
