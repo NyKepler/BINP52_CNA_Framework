@@ -8,7 +8,7 @@ channels:
 
 dependencies:
  - r-base
- - r-biocmanager=1.30.22
  - r-nmf=0.21.0
  - r-flexmix=2.3_19
+ - bioconductor-yapsa=1.28.0
  - bioconductor-qdnaseq=1.36.0
