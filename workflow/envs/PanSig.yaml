@@ -9,3 +9,4 @@ channels:
 dependencies:
  - r-base
  - r-devtools=2.4.5
+ - r-tidyverse=2.0.0

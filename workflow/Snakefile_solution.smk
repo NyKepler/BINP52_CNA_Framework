@@ -1,6 +1,6 @@
-# Title: Snakefile_draft.smk
+# Title: Snakefile_solution.smk
 # Author: Guyuan TANG
-# Date: 2023/10/16 - 2023/11/26
+# Date: 2023/10/16 - 2023/11/30
 
 import pandas as pd
 
@@ -21,8 +21,7 @@ binsize = str(config['QDNAseq']['binsize'])
 
 # specify the final output of the whole workflow
 """
-the final output for the whole workflow should be the absolute copy number profile for each type/group of samples.
-For example: archive (pre-diagnosis), diagnosis, tumor tissue.
+the final output for the whole workflow should be the estimated solutions of ploidy and cellularity for each sample.
 """
 rule all:
     input:
