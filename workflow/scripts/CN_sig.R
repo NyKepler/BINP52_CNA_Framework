@@ -37,7 +37,7 @@ for (i in sample_names) {
 names(segment_list) <- sample_names
 
 # validate the signatures in the samples
-CN_features <- extractCopynumberFeatures(segment_table_list)
+CN_features <- extractCopynumberFeatures(segment_list)
 sample_by_component <- generateSampleByComponentMatrix(CN_features)
 output_matrix <- quantifySignatures(sample_by_component)
 
