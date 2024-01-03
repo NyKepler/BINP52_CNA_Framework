@@ -1,26 +1,33 @@
 #!/usr/bin/env Rscript
 
+# Title: fit_CN_solution.R
+# Author: Guyuan TANG
+# Date: 2023/11/17
+
+# Description: this script will be used for calculating the optimal solutions (ploidy and cellularity) for each sample. It is designed based on the fit_absolute_copy_number.R provided by the rascal package.
+
+
 library(optparse)
 
 option_list <- list(
   make_option(c("-i", "--input-file"), dest = "input_file",
               help = "RDS, CSV or tab-delimited file containing copy number table with sample, chromosome, start, end copy_number and segmented columns or RDS file containing QDNAseqCopyNumbers object"),
-
-  make_option(c("-o", "--output-file"), dest = "output_prefix",
+  
+  make_option(c("-o", "--output-prefix"),type="character", dest = "output_prefix",
               help = "The prefix for comma-separated value (CSV) output files"),
-
+  
   make_option(c("-s", "--sample"), dest = "sample",
               help = "Name of sample to perform copy number fitting on (all samples if unset)"),
-
+  
   make_option(c("--min-ploidy"), dest = "min_ploidy", default = 1.25,
               help = "The minimum ploidy to consider (default: %default)"),
-
+  
   make_option(c("--max-ploidy"), dest = "max_ploidy", default = 5.25,
               help = "The maximum ploidy to consider (default: %default)"),
-
+  
   make_option(c("--min-cellularity"), dest = "min_cellularity", default = 0.2,
               help = "The minimum cellularity to consider (default: %default)"),
-
+  
   make_option(c("--max-cellularity"), dest = "max_cellularity", default = 1.0,
               help = "The maximum cellularity to consider (default: %default)")
 )
@@ -41,7 +48,7 @@ min_cellularity <- opt$min_cellularity
 max_cellularity <- opt$max_cellularity
 
 if (is.null(input_file)) stop("Copy number RDS/CSV/TSV file must be specified")
-if (is.null(output_prefix)) stop("Output file must be specified")
+
 
 library(tibble)
 library(readr)
@@ -108,28 +115,32 @@ all_solutions <- NULL
 number_of_samples <- length(samples)
 append <- FALSE
 
+
+
 for (sample_index in 1:number_of_samples) {
   sample <- samples[sample_index]
-
+  
   sample_copy_number <- copy_number_for_sample(copy_number, sample)
-
+  
   # copy number fitting requires relative copy numbers where values are relative
   # to the average copy number across the genome - using the median segmented
   # copy number
   relative_copy_number <- mutate(sample_copy_number, across(c(copy_number, segmented), ~ . / median(segmented, na.rm = TRUE)))
-
+  
   segments <- copy_number_segments(relative_copy_number)
-
+  
   solutions <- find_best_fit_solutions(
     segments$copy_number, segments$weight,
     min_ploidy = min_ploidy, max_ploidy = max_ploidy, ploidy_step = 0.01,
     min_cellularity = min_cellularity, max_cellularity = max_cellularity, cellularity_step = 0.01,
     distance_function = "MAD")
-
+  
   message(sample_index, "/", number_of_samples, " ", sample, " ", nrow(solutions))
-
-  if (nrow(solutions) == 0) next
-
+  
+  if (nrow(solutions) == 0) {
+    solutions <- tibble(sample = sample, ploidy = -1, cellularity = -1, distance = -1)
+  }
+  
   solutions <- solutions %>%
     transmute(sample = sample, ploidy, cellularity, distance)
   
@@ -138,36 +149,6 @@ for (sample_index in 1:number_of_samples) {
     mutate(across(c(ploidy, cellularity), round, digits = 2)) %>%
     mutate(across(distance, round, digits = 3)) %>%
     write_csv(output_solution, append = append)
-
-  
-  # use TP53 to select the best solution
-  min_dist <- min(solutions$distance)
-  solutions_tp53 <- solutions[solutions$distance == min_dist,] %>%
-    mutate(tp53_absolute_copy_number = relative_to_absolute_copy_number(0.832, ploidy, cellularity)) %>%
-    mutate(tp53_tumour_fraction = tumour_fraction(tp53_absolute_copy_number, cellularity)) %>%
-    mutate(tp53_dist = abs(tp53_tumour_fraction - cellularity))
-  
-  # the best solution
-  best_p = solutions_tp53[solutions_tp53$tp53_dist == min(solutions_tp53$tp53_dist),]$ploidy
-  best_c = solutions_tp53[solutions_tp53$tp53_dist == min(solutions_tp53$tp53_dist),]$cellularity
-  
-  output_best_s = paste0(output_prefix, '.best_solution.csv')
-  best_s <- solutions_tp53[(solutions_tp53$ploidy == best_p) & (solutions_tp53$cellularity == best_c),] %>%
-    mutate(across(c(ploidy, cellularity, tp53_absolute_copy_number), round, digits = 2)) %>%
-    mutate(across(c(distance, tp53_tumour_fraction, tp53_dist), round, digits = 3)) %>%
-    write_csv(output_best_s, append = append)
-
-  
-  # generate absolute copy numbers
-  absolute_copy_number <- mutate(relative_copy_number, 
-                                 across(c(copy_number, segmented),
-                                 relative_to_absolute_copy_number, best_p, best_c))
-  
-  
-  output_CN = paste0(output_prefix, '.absoluteCN.csv')
-  absolute_copy_number %>% write_csv(output_CN, append = append)
-  
-  
   append <- TRUE
   
   all_solutions <- bind_rows(all_solutions, solutions)
@@ -179,4 +160,3 @@ message("Solutions found for ", length(unique(all_solutions$sample)), " of ", le
 all_solutions %>%
   count(sample) %>%
   print(n = Inf)
-

@@ -21,18 +21,39 @@ CN_method: rascal
 
 # QDNAseq setting (binsize could be selected from 1, 5, 10, 15, 30, 50, 100,etc., the unit should be kb)
 QDNAseq:
-  binsize: 1
+  binsize: 100
   # the maximum size of data running in R programme (unit: Mb)
-  # for 1kb, it recommends to use at least 2.5 Gb (2560Mb)
-  maxSize: 2560
+  # for 1kb, it recommends to use at least 2 Gb (2048Mb)
+  maxSize: 850
   # the number of threads in running QDNAseq, it will matter how many jobs running in parallel in Snakemake pipeline
   # for binsize <= 15kb, it recommends to operate no more than 2 jobs at a same time to avoid potential errors
-  threads: 30
+  # number of jobs in parallel: total cores / threads
+  threads: 3
 
 
 # Rascal setting (min cellularity and other settings)
 Rascal:
   min_cellularity: 0
+
+
+
+
+###### Settting for the second part of the workflow #######
+# specify the tsv file contaning samples and their relative copy number solutions derived from the first part of the workflow (Snakefile_solution.smk)
+samp_solutions: 'config/solution_sample.tsv'
+
+# path to the cnsignature scripts
+cnsig_path: 'workflow/scripts/cnsignatures/'
+
+
+
+
+
+
+
+
+
+
 
 
 ####### HMMcopy settings #######
