@@ -1,6 +1,6 @@
 # Title: Snakefile_CNsig.smk
 # Author: Guyuan TANG
-# Date: 2023/12/27 - 
+# Date: 2023/12/27 - 2024/1/2
 
 import pandas as pd
 
@@ -63,7 +63,7 @@ rule rascal_absolute_CN:
 
 ########## 2 CN Signatures ####################
 """
-The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap) for each group. The matrices containing sample-by-signature information.
+The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap for both sample-by-component matrix and sample-by-signature matrix) for each group. The matrices containing sample-by-signature information.
 """
 # 2.1 clone the github repository used for signature validation
 rule cn_sig_git:

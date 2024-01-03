@@ -48,8 +48,14 @@ write.table(output_matrix, file = paste0(output_prefix, '.matrix.txt'))
 # matrix object
 saveRDS(output_matrix, file = paste0(output_prefix, '.matrix.rds'), compress = FALSE)
 # simple heatmap
-pdf(paste0(output_prefix,'.heatmap.pdf'))
+pdf(paste0(output_prefix,'.heatmapSS.pdf'))
 heatmap(output_matrix)
+dev.off()
+# the same output for the sample-by-component matrix should also be saved for future analysis
+write.table(sample_by_component, file = paste0(output_prefix, '.SCmatrix.txt'))
+saveRDS(sample_by_component, file = paste0(output_prefix, '.SCmatrix.rds'), compress = FALSE)
+pdf(paste0(output_prefix, 'heatmapSC.pdf'))
+heatmap(sample_by_component)
 dev.off()
 
 
