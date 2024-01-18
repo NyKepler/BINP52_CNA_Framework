@@ -13,3 +13,4 @@ dependencies:
  - r-tidyverse=2.0.0
  - bioconductor-yapsa=1.28.0
  - bioconductor-qdnaseq=1.38.0
+ - r-lsa=0.73.3
