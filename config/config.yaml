@@ -45,8 +45,11 @@ samp_solutions: 'config/solution_sample.tsv'
 # path to the cnsignature scripts
 cnsig_path: 'workflow/scripts/cnsignatures/'
 
-
-
+# specify the downloaded and decompressed supplement tables for PanCancer signatures
+## the folder name after unzip
+supple_folder: 'resources/PanCan/'
+## the required supplement table
+supple_tab: 'resources/PanCan/Supplementary Tables 15-22.xlsx'
 
 
 

@@ -11,3 +11,5 @@ dependencies:
  - r-devtools=2.4.5
  - r-tidyverse=2.0.0
  - r-lsa=0.73.3
+ - r-openxlsx=4.2.5.2
+ - r-optparse=1.7.4
