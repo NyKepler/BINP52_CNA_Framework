@@ -1,62 +1,39 @@
 #!/usr/bin/env Rscript
 
-# Title: fit_CN_solution.R
+# Title: fit_absoluteCN.R
 # Author: Guyuan TANG
-# Date: 2023/11/17
+# Date: 2023/12/27
 
-# Description: this script will be used for calculating the optimal solutions (ploidy and cellularity) for each sample. It is designed based on the fit_absolute_copy_number.R provided by the rascal package.
+# Description: this script will be used for generating the absolute copy number profile (including copy numbers and segments) for each sample. It is designed based on the fit_absolute_copy_number.R provided by the rascal package.
 
-
-library(optparse)
-
-option_list <- list(
-  make_option(c("-i", "--input-file"), dest = "input_file",
-              help = "RDS, CSV or tab-delimited file containing copy number table with sample, chromosome, start, end copy_number and segmented columns or RDS file containing QDNAseqCopyNumbers object"),
-  
-  make_option(c("-o", "--output-prefix"),type="character", dest = "output_prefix",
-              help = "The prefix for comma-separated value (CSV) output files"),
-  
-  make_option(c("-s", "--sample"), dest = "sample",
-              help = "Name of sample to perform copy number fitting on (all samples if unset)"),
-  
-  make_option(c("--min-ploidy"), dest = "min_ploidy", default = 1.25,
-              help = "The minimum ploidy to consider (default: %default)"),
-  
-  make_option(c("--max-ploidy"), dest = "max_ploidy", default = 5.25,
-              help = "The maximum ploidy to consider (default: %default)"),
-  
-  make_option(c("--min-cellularity"), dest = "min_cellularity", default = 0.2,
-              help = "The minimum cellularity to consider (default: %default)"),
-  
-  make_option(c("--max-cellularity"), dest = "max_cellularity", default = 1.0,
-              help = "The maximum cellularity to consider (default: %default)")
-)
-
-option_parser <- OptionParser(usage = "usage: %prog [options]", option_list = option_list, add_help_option = TRUE)
-
-args <- commandArgs(trailingOnly = TRUE)
-if (length(args) == 0) args <- "--help"
-
-opt <- parse_args(option_parser, args)
-
-input_file <- opt$input_file
-output_prefix <- opt$output_prefix
-sample <- opt$sample
-min_ploidy <- opt$min_ploidy
-max_ploidy <- opt$max_ploidy
-min_cellularity <- opt$min_cellularity
-max_cellularity <- opt$max_cellularity
-
-if (is.null(input_file)) stop("Copy number RDS/CSV/TSV file must be specified")
-
+# Steps:
+## 1. take in the sample table and extract the information (binsize, ploidy and cellularity) of the selected sample;
+## 2. load the corresponding QDNAseq RDS file and use the information to calculate the absolute copy numbers, and apply segmentation on the absolute copy number profile;
+## 3. export the absolute copy numbers and segments for the following analysis in the workflow.
 
 library(tibble)
 library(readr)
 library(tidyr)
 library(dplyr)
 library(stringr)
+library(QDNAseq)
 library(rascal)
 
+# specify the output location
+outdir <- snakemake@params[['outdir']]
+
+####### 1. Sample Information #######
+# load the sample table
+samptable_path <- snakemake@input[['sample_table']]
+sample_df <- read.table(samptable_path, sep = '\t', header = 1)
+# the information of the selected sample
+sample_ID <- snakemake@params[['sample']]
+bins <- sample_df[which(sample_df$Sample == sample_ID), 'Binsize']
+ploidy <- as.numeric(sample_df[which(sample_df$Sample == sample_ID), 'Ploidy'])
+cellularity <- as.numeric(sample_df[which(sample_df$Sample == sample_ID), 'Cellularity'])
+rds <- sample_df[which(sample_df$Sample == sample_ID), 'rds']
+
+####### 2. Calculate Absolute Copy Number #######
 # function for extracting the copy number for a given sample
 # can handle QDNAseqCopyNumbers object or a copy number data frame
 copy_number_for_sample <- function(copy_number, sample) {
@@ -79,15 +56,8 @@ copy_number_for_sample <- function(copy_number, sample) {
   }
 }
 
-# read copy number data from input file
-if (str_detect(input_file, "\\.rds$")) {
-  copy_number <- readRDS(input_file)
-} else if (str_detect(input_file, "\\.csv(\\.gz)?$")) {
-  copy_number <- read_csv(input_file, col_types = cols(sample = "c", chromosome = "f", start = "i", end = "i", copy_number = "d", segmented = "d"))
-} else {
-  copy_number <- read_tsv(input_file, col_types = cols(sample = "c", chromosome = "f", start = "i", end = "i", copy_number = "d", segmented = "d"))
-}
-
+# load the QDNAseq rds file
+copy_number <- readRDS(rds)
 # check contents are correct and obtain sample names
 if (any(class(copy_number) == "data.frame")) {
   required_columns <- c("sample", "chromosome", "start", "end", "segmented")
@@ -98,65 +68,32 @@ if (any(class(copy_number) == "data.frame")) {
   if (!requireNamespace("QDNAseq", quietly = TRUE)) stop("QDNAseq package needs to be installed")
   samples <- sort(Biobase::sampleNames(copy_number))
 } else {
-  stop(input_file, " should contain either a data frame or a QDNAseqCopyNumbers object")
+  stop(rds, " should contain either a data frame or a QDNAseqCopyNumbers object")
 }
 
-# check specified sample is found in the copy number data
-if (!is.null(sample)) {
-  if (sample %in% samples) {
-    samples <- sample
-  } else {
-    stop(sample, " not found in ", input_file)
-  }
-}
+# absolute copy number calculation
+sample_copy_number <- copy_number_for_sample(copy_number, sample = paste0(sample_ID, '.sorted.dedup'))
+relative_copy_number <- mutate(sample_copy_number, across(c(copy_number, segmented), ~ . / median(segmented, na.rm = TRUE)))
+segments <- copy_number_segments(relative_copy_number)
+absolute_copy_number <- mutate(relative_copy_number, 
+                               across(c(copy_number, segmented),
+                                      relative_to_absolute_copy_number, ploidy, cellularity))
+absolute_segments <- copy_number_segments(absolute_copy_number)
+# rename the column and add the sample column
+absolute_copy_number <- rename(absolute_copy_number, c('segVal'='segmented'))
+absolute_copy_number['sample'] <- sample_ID
+absolute_segments <- rename(absolute_segments, c('segVal'='copy_number'))
+absolute_segments['sample'] <- sample_ID
 
-all_solutions <- NULL
+####### 3. Export Absolute Copy Number #######
+output_CN <- paste0(outdir, sample_ID, '_', bins, 'kb_CN.tsv')
+write.table(absolute_copy_number, file = output_CN, row.names = FALSE, sep = '\t', quote = FALSE)
+output_seg <- paste0(outdir, sample_ID, '_', bins, 'kb_seg.tsv')
+write.table(absolute_segments, file = output_seg, row.names = FALSE, sep = '\t', quote = FALSE)
 
-number_of_samples <- length(samples)
-append <- FALSE
 
 
 
-for (sample_index in 1:number_of_samples) {
-  sample <- samples[sample_index]
-  
-  sample_copy_number <- copy_number_for_sample(copy_number, sample)
-  
-  # copy number fitting requires relative copy numbers where values are relative
-  # to the average copy number across the genome - using the median segmented
-  # copy number
-  relative_copy_number <- mutate(sample_copy_number, across(c(copy_number, segmented), ~ . / median(segmented, na.rm = TRUE)))
-  
-  segments <- copy_number_segments(relative_copy_number)
-  
-  solutions <- find_best_fit_solutions(
-    segments$copy_number, segments$weight,
-    min_ploidy = min_ploidy, max_ploidy = max_ploidy, ploidy_step = 0.01,
-    min_cellularity = min_cellularity, max_cellularity = max_cellularity, cellularity_step = 0.01,
-    distance_function = "MAD")
-  
-  message(sample_index, "/", number_of_samples, " ", sample, " ", nrow(solutions))
-  
-  if (nrow(solutions) == 0) {
-    solutions <- tibble(sample = sample, ploidy = -1, cellularity = -1, distance = -1)
-  }
-  
-  solutions <- solutions %>%
-    transmute(sample = sample, ploidy, cellularity, distance)
-  
-  output_solution = paste0(output_prefix, '.solution.csv')
-  solutions %>%
-    mutate(across(c(ploidy, cellularity), round, digits = 2)) %>%
-    mutate(across(distance, round, digits = 3)) %>%
-    write_csv(output_solution, append = append)
-  append <- TRUE
-  
-  all_solutions <- bind_rows(all_solutions, solutions)
-  
-}
 
-message("Solutions found for ", length(unique(all_solutions$sample)), " of ", length(samples), " samples")
 
-all_solutions %>%
-  count(sample) %>%
-  print(n = Inf)
+
