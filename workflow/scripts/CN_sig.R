@@ -55,6 +55,7 @@ dev.off()
 # apply cosine similarity to find the enriched signature for each sample
 ## load the signature definition table for Brenton's CN signatures
 feat_sig_mat <- snakemake@params[['def_SC']]
+feat_sig_mat <- readRDS(feat_sig_mat)
 CN_sig <- paste0('s',c(1:7))
 
 ## load the Sample-by-Component matrix generated above

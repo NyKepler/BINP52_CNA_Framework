@@ -25,8 +25,7 @@ The final output of this workflow should be the signature similarity matrix for 
 rule all:
     input:
         CN_sig_SS = results + 'signatures/CN_sig/CN_sig.SSmatrix.rds',
-        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds',
-        panConu_sig_SS = results + 'signatures/panConusig/panConu_sig.SSmatrix.rds'
+        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds'
 
 
 ########## 1 Absolute copy number profiles ####################
@@ -105,7 +104,7 @@ rule CN_signature:
         def_SC = 'workflow/scripts/cnsignatures/data/feat_sig_mat.rds',
         indir = results,
         outdir = results + 'signatures/CN_sig/'
-    threads: 10
+    threads: 20
     conda: 'envs/CNsig.yaml'
     script: 'scripts/CN_sig.R'
 
