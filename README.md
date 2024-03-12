@@ -16,8 +16,9 @@ The version of tools and packages to be used will be specified in each step (see
 - (4) Relative copy number profile. The BAM files will be analyzed through fixed-size binning, filtering, correction, normalization to generate the read counts per bin. This data will then used for segmentation of bins and generating the relative copy number profile. (`QDNAseq` will be used for this step.)
 - (5) Ploidy and cellularity solutions. The output file from `QDNAseq` contains relative copy number, and we need to estimate ploidy and cellularity in our samples to generate our final absolute copy number profile for comparison. (`Rascal` will be used for this step to find the solutions that best fit our study samples.)
 - (6) Absolute copy number profile. We will further use other information (such as TP53 allele frequency) inferring the tumour fraction to select the best ploidy and cellularity solution. We apply this best solution to our relative copy number profile, and generate the final absolute copy number profile for each sample. (`Rascal` will be used for this step.)
-- (7) Comparison with the recent HGSC signatures (n=7).
-- (8) Comparison with the Pan-Cancer signatures (n=17).  
+- (7) Comparison with the recent HGSC signatures (n=7). The functions should be loaded from the github repository: https://bitbucket.org/britroc/cnsignatures.git .
+- (8) Comparison with the Pan-Cancer signatures (n=17). The package `CINSignatureQuantification` will be used to generate the samply-by-component matrix for the Pan-Cancer chromosomal instability signatures.
+- (9) Comparison with the panConusig signatures (n=25). Tools including `Battenberg` (`alleleCounter`, `impute2` and `beagle5` were included in this package), `ASCAT.sc` and `panConusig` will be used in this step.
 
 ### 1.3 File structure and descriptions
 
@@ -463,19 +464,16 @@ rule CN_signature:
         helper = 'workflow/scripts/cnsignatures/helper_functions.R',
         # check all the absolute copy number profiles have successfully been generated
         check_data = rules.cn_sig_check.output,
-        # the input files for each group
-        seg_files = lambda wildcards: get_group_file(sample_df, results, wildcards.group)
+        # the input segment files
+        seg_files = rules.absolute_seg_CN.input
     output:
-        CN_sig = results + 'signatures/{group}/CNsig/{group}_CNsig.{binsize}kb.matrix.rds'
-    wildcard_constraints:
-        binsize="\d+"
+        CN_sig = results + 'signatures/CN_sig/CN_sig.SSmatrix.rds'
     params:
-        groupID = '{group}',
-        binsize = '{binsize}',
-        sample_names = lambda wildcards: sample_df[sample_df['Group'].isin([wildcards.group])].Sample.tolist(),
+        sample_info = config['samp_solutions'],
+        def_SC = 'workflow/scripts/cnsignatures/data/feat_sig_mat.rds',
         indir = results,
-        outdir = results + 'signatures/'
-    threads: 10
+        outdir = results + 'signatures/CN_sig/'
+    threads: 20
     conda: 'envs/CNsig.yaml'
     script: 'scripts/CN_sig.R'
 ```
@@ -491,33 +489,52 @@ This step will generate the sample-by-component matrix and the sample-by-signatu
  - r-CINSignatureQuantification=1.2.0 (this should be installed from the github repository)
 ```
 
-Firstly, we need to set up the environment and install the required scripts from github repository.
+Firstly, we need to check if we have downloaded the definition signature-by-component table for PanCan signature. (This should be prepared in the `resources/` folder automatically.)
+```
+rule PanCan_def_tab:
+    # user should download the supplements manually
+    # website: https://www-nature-com.ludwig.lub.lu.se/articles/s41586-022-04789-9#Sec17
+    input:
+        config['supple_tab']
+    output:
+        'resources/PanCan.xlsx'
+    params:
+        select_tab = 'workflow/scripts/select_tab.R',
+        folder = config['supple_folder']
+    conda: 'envs/PanCanSig.yaml'
+    shell:'''
+        mv '{input}' resources/Supplementary_Tables_15-22.xlsx
+        Rscript {select_tab} -i resources/Supplementary_Tables_15-22.xlsx -o resources/PanCan.xlsx
+        rm -r {folder}
+    '''
+``` 
+
+Secondly, we need to set up the environment and install the required scripts from github repository.
 ```
 rule PanCan_sig_env:
+    input:
+        'resources/PanCan.xlsx'
     output:
         "log/PanCan_settle_info.txt"
-    conda: 'envs/PanSig.yaml'
+    conda: 'envs/PanCanSig.yaml'
     script: 'scripts/PanCan_sig_env.R'
 ```
 
-Secondly, we run the signature validation programme on our samples. The actural outputs also include a RDS file containing all the matrix information (activities and weights) and two simple heatmaps (one for activities and one for the sample-by-component matrix) for each group.
+Thirdly, we run the signature validation programme on our samples. The actural outputs also include a RDS file containing all the matrix information (activities and weights) and two simple heatmaps (one for activities and one for the sample-by-component matrix) for each group.
 ```
 rule PanCan_sig:
     input:
         env_set = "log/PanCan_settle_info.txt",
-        seg_files = lambda wildcards: get_group_file(sample_df, results, wildcards.group)
+        seg_files = rules.absolute_seg_CN.input
     output:
-        PanSig = results + 'signatures/{group}/PanSig/{group}_PanSig.{binsize}kb.matrix.rds'
-    wildcard_constraints:
-        binsize="\d+"
+        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds'
     params:
-        groupID = '{group}',
-        binsize = '{binsize}',
-        sample_names = lambda wildcards: sample_df[sample_df['Group'].isin([wildcards.group])].Sample.tolist(),
+        sample_info = config['samp_solutions'],
+        def_SC = 'resources/PanCan.xlsx',
         indir = results,
-        outdir = results + 'signatures/'
+        outdir = results + 'signatures/PanCan_sig/'
     threads: 10
-    conda: 'envs/PanSig.yaml'
+    conda: 'envs/PanCanSig.yaml'
     script: 'scripts/PanCan_sig.R'
 ```
 
@@ -550,7 +567,7 @@ This step will generate the sample-by-component matrix and the sample-by-signatu
  - bioconductor-dnacopy=1.76.0
  - openjdk=21.0.2
 ```
-Firstly, we need to prepare the environment for Battenberg, which should be installed in R.
+Firstly, we need to prepare the environment for `Battenberg`, which should be installed in R.
 ```
 rule panConusig_env:
     output:
@@ -558,7 +575,7 @@ rule panConusig_env:
     conda: 'envs/panConusig.yaml'
     script: 'scripts/panConusig_env.R'
 ```
-Secondly, we need to prepare the reference files for Battenberg and beagle5.
+Secondly, we need to prepare the reference files for `Battenberg` and `beagle5`.
 ```
 rule panConusig_ref_prep:
     input:
@@ -574,4 +591,36 @@ rule panConusig_ref_prep:
     cat {input.impute_00} | sed 's#<path_to_impute_reference_files>#{params.workdir}#g' > {params.impute_info}
     '''
 ```
-Thirdly, we run the Battenberg and ASCAT.sc to generate the allele frequency files and phased files which are required for the next step.
+Thirdly, we run the `Battenberg` and `ASCAT.sc` to generate the allele frequency files and phased files which are required for the next step.
+```
+rule panConusig_preprocessing:
+    input: 
+        ref_files = rules.panConusig_ref_prep.output,
+        usr_battenberg = "workflow/scripts/usr_battenberg.R",
+        bam_file = results + '{sample}/03_clean_up/{sample}.sorted.dedup.bam'
+    output:
+        preprocess_out = get_panConusig_preprocess(results, wildcards.sample)
+    params:
+        sampleID = '{sample}',
+        impute_ref_dir = working_dir + 'resources/battenberg',
+        beagle_ref_dir = working_dir + 'resources/battenberg/beagle',
+        result_dir = results + '{sample}/06_panConusig/',
+        ASCAT_outdir = results + '{sample}/06_panConusig/ASCAT_out/',
+        binsize = lambda wildcards: sample_df.loc[wildcards.sample, 'Binsize']
+    threads: 30
+    conda: 'envs/panConusig.yaml'
+    script: 'scripts/panConusig_preprocess.R'
+```
+Finally, similar to CN_sig and PanCan_sig, we extract the sample-by-component matrix of panConusig and apply cosine similarity method to discover the signatures that share most components.
+```
+rule panConusig_sig:
+    input:
+        cna_profiles = get_cna_profile(sample_df, results)
+    output:
+        panConusig_SS = results + 'signatures/panConusig/panConusig.SSmatrix.rds'
+    params:
+        def_SC = 'resources/panConusig_id.txt',
+        outdir = results + 'signatures/panConusig/'
+    conda: 'envs/panConusig.yaml'
+    script: 'scripts/panConusig.R'
+```
