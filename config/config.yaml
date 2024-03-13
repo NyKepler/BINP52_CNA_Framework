@@ -3,6 +3,9 @@
 
 # Description: this is the config file describing the chagable parameters in the workflow
 
+# specify the location where you downloaded the workflow
+workdir: '/home/researcher/TangGY/BINP52/Workflow/Draft/'
+
 
 # specify the sample list to be used
 samples: 'config/All_samples.tsv'
@@ -15,7 +18,7 @@ bwa_mapping:
   threads: 24
 
 
-# method to generate the copy number profiles (either rascal or ichorCNA)
+# method to generate the copy number profiles (either rascal
 CN_method: rascal
 
 
@@ -40,7 +43,7 @@ Rascal:
 
 ###### Settting for the second part of the workflow #######
 # specify the tsv file contaning samples and their relative copy number solutions derived from the first part of the workflow (Snakefile_solution.smk)
-samp_solutions: 'config/solution_sample.tsv'
+samp_solutions: 'config/solution_tumor.tsv'
 
 # path to the cnsignature scripts
 cnsig_path: 'workflow/scripts/cnsignatures/'
@@ -51,62 +54,13 @@ supple_folder: 'resources/PanCan/'
 ## the required supplement table
 supple_tab: 'resources/PanCan/Supplementary Tables 15-22.xlsx'
 
+# specify the threads for Battenberg to run
+battenberg_threads: 30
 
 
 
 
 
 
-
-
-####### HMMcopy settings #######
-# the bin size for HMMcopy to generate the read counts per bin
-hmm_window: 1000000
-# the mapping quality threshold
-hmm_quality: 0
-
-
-
-####### ichorCNA settings #######
-# some existing files for ichorCNA
-ichorCNA_settings:
-  ## the main script
-  ichorCNA_script: '/home/researcher/TangGY/BINP52/Other_information/ichorCNA-master/scripts/runIchorCNA.R'
-  ## the path to GC-content WIG file (should be corresponded to the selected bin size in HMMcopy)
-  gcWig: '/home/researcher/TangGY/BINP52/Other_information/ichorCNA-master/inst/extdata/gc_hg19_1000kb.wig'
-  ## the path to mappability score WIG file (should be corresponded to the selected bin size)
-  mapWig: '/home/researcher/TangGY/BINP52/Other_information/ichorCNA-master/inst/extdata/map_hg19_1000kb.wig'
-  ## the path to the file containing centromere locations
-  centromere: '/home/researcher/TangGY/BINP52/Other_information/ichorCNA-master/inst/extdata/GRCh37.p13_centromere_UCSC-gapTable.txt'
-  ## the median corrected depth from panel of normals
-  normalPanels: '/home/researcher/TangGY/BINP52/Other_information/ichorCNA-master/inst/extdata/HD_ULP_PoN_1Mb_median_normAutosome_mapScoreFiltered_median.rds'
-
-#some settings for running the ichorCNA
-  ## initial tumour ploidy
-  ploidy: c(2,3,4)
-  ## total clonal CN states
-  maxCN: 7
-  ## initial normal contamination
-  normal: c(0.5,0.6,0.7,0.8,0.9)
-  ## self-transition probability. Increase to decrease number of segments
-  txnE: 0.9999
-  ## transition pseudo-counts
-  txnStrength: 10000
-  ## subclonal states to consider
-  scStates: c(1,3)
-  ## whether to exclude HOMD state. Useful when using large bins
-  includeHOMD: False
-  ## specify chromosomes to analyze
-  chrs: c(1:22)
-  ## specify chromosomes to estimate parameters
-  chrTrain: c(1:22,\"X\")
-  ## estimate normal
-  estimateNormal: True
-  ## estimate subclonal prevalence
-  estimateScPrevalence: True
-  ## estimate tumour ploidy
-  estimatePloidy: True
-  ## normalize chrX by median if the sample is male
-  normalizeMaleX: False
 
 
