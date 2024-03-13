@@ -67,23 +67,8 @@ def get_ref_beagle(working_dir):
         files.append(bref_file)
     return files
 
-## 4. generate the output files after the preprocessing step of panConusig
-def get_panConusig_preprocess(results, sampleID):
-    files = []
-    chr_list = list(range(1,22))
-    for chr in chr_list:
-        chr = str(chr)
-        # essential output files from Battenberg
-        alleleFreq = results + sampleID + '/06_panConusig/' + sampleID + '_alleleFrequencies_chr' + chr + '.txt'
-        beagle_phase = results + sampleID + '/06_panConusig/' + sampleID + '_beagle5_output_chr' + chr + '.txt.vcf.gz'
-        files.extend((alleleFreq, beagle_phase))
-    # output from ASCAT.sc
-    as_cna_raw = results + sampleID + '/06_panConusig/ASCAT_out/as_cna_profile_' + sampleID + '.sorted.dedup.bam_bam1.txt'
-    as_cna_out = results + sampleID + '/06_panConusig/ASCAT_out/as_cna_profile_' + sampleID + '.txt'
-    files.extend((as_cna_raw, as_cna_out))
-    return files
 
-## 5. generate the input file list for panConusig
+## 4. generate the input file list for panConusig
 def get_cna_profile(sample_df, results):
     files = []
     sample_list = sample_df.Sample

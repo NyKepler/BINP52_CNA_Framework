@@ -180,7 +180,7 @@ rule panConusig_env:
 rule panConusig_ref_prep:
     input:
         env_set = "log/panConusig_settle_info.txt",
-        impute_00 = working_dir + 'resources/battenberg/impute_info00.txt'
+        impute_00 = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info00.txt'
     output:
         ref_battenberg = get_ref_battenberg(working_dir),
         ref_beagle = get_ref_beagle(working_dir)
@@ -198,7 +198,7 @@ rule panConusig_preprocessing:
         usr_battenberg = "workflow/scripts/usr_battenberg.R",
         bam_file = results + '{sample}/03_clean_up/{sample}.sorted.dedup.bam'
     output:
-        preprocess_out = get_panConusig_preprocess(results, wildcards.sample)
+        as_cna_out = results + '{sample}/06_panConusig/ASCAT_out/{sample}_as_cna_profile.tsv'
     params:
         sampleID = '{sample}',
         impute_ref_dir = working_dir + 'resources/battenberg',
