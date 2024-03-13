@@ -1,0 +1,33 @@
+name: panConusig
+
+channels:
+ - conda-forge
+ - bioconda
+ - r
+ - defaults
+
+dependencies:
+ - r-base=4.3.3
+ - r-tidyverse=2.0.0
+ - r-biocmanager=1.30.22
+ - cancerit-allelecount=4.3.0
+ - r-devtools=2.4.5
+ - r-gridextra=2.3
+ - r-rcolorbrewer=1.1_3
+ - r-splines2=0.5.1
+ - r-readr=2.1.5
+ - r-doparallel=1.0.17
+ - r-ggplot2=3.4.4
+ - r-gtools=3.9.5
+ - parallel=20170422(20240122)
+ - bioconductor-variantannotation=1.48.1
+ - r-xgboost=2.0.3
+ - bioconductor-genomicranges=1.54.1
+ - bioconductor-biostrings02.70.1
+ - bioconductor-dnacopy=1.76.0
+ - curl=8.5.0
+ - impute2=2.3.2
+ - java-jdk=8.0.92
+ - r-rjava=1.0_10
+ - openjdk=21.0.2
+ - r-lsa=0.73.3
