@@ -25,13 +25,13 @@ def get_ref_battenberg(working_dir):
         genomelociAllele =  dir_prefix +'battenberg_1000genomesloci2012_v3/1000genomesAlleles2012_chr' + i + '.txt'
         genomeloci = dir_prefix + 'battenberg_1000genomesloci2012_v3/1000genomesloci2012_chr' + i + '.txt'
         # wgs GC correction files
-        wgs_gc_correction = dir_prefix + 'battenberg_wgs_gc_correction_1000g_v3/1000_genomes_GC_corr_chr_' + i + '.txt'
+        wgs_gc_correction = dir_prefix + 'battenberg_wgs_gc_correction_1000g_v3/1000_genomes_GC_corr_chr_' + i + '.txt.gz'
         # wgs replication correction files
         wgs_rep_correction = dir_prefix + 'battenberg_wgs_replic_correction_1000g_v3/1000_genomes_replication_timing_chr_' + i + '.txt.gz'
         files.extend((genomelociAllele, genomeloci, wgs_gc_correction, wgs_rep_correction))
     impute_list = list(range(1,23))
     impute_list.extend(('X_nonPAR', 'X_PAR1', 'X_PAR2'))
-    files.extend((dir_prefix+'battenberg_impute_v3/ALL_1000G_phase1integrated_v3.sample', dir_prefix+'impute_info.txt', dir_prefix+'README_1000G_phase1integrated_v3.txt'))
+    files.extend((dir_prefix+'battenberg_impute_v3/ALL_1000G_phase1integrated_v3.sample', dir_prefix+'battenberg_impute_v3/README_1000G_phase1integrated_v3.txt'))
     for chr in impute_list:
         chr = str(chr)
         # ALL phased haplotypes
@@ -48,7 +48,7 @@ def get_ref_beagle(working_dir):
     files = []
     dir_prefix = working_dir + 'resources/battenberg/'
     # the running program
-    files.append(dir_prefix+'beagle.22Jul22.46e.jar')
+    files.append(dir_prefix+'beagle/beagle.22Jul22.46e.jar')
     # the folder containing all the reference files
     dir_b37 = dir_prefix + 'beagle/b37/'
     # the plink files

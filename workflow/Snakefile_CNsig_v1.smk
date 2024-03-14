@@ -4,7 +4,7 @@
 
 import pandas as pd
 
-from scripts.common import get_output_absolute, get_ref_battenberg, get_ref_beagle, get_panConusig_preprocess, get_cna_profile
+from scripts.common import get_output_absolute, get_ref_battenberg, get_ref_beagle, get_cna_profile
 
 # specify the configuration file
 configfile: "config/config.yaml"
@@ -180,15 +180,15 @@ rule panConusig_env:
 rule panConusig_ref_prep:
     input:
         env_set = "log/panConusig_settle_info.txt",
-        impute_00 = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info00.txt'
-    output:
+        impute_00 = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info00.txt',
         ref_battenberg = get_ref_battenberg(working_dir),
         ref_beagle = get_ref_beagle(working_dir)
+    output:
+        impute_info = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info.txt'
     params:
-        workdir = working_dir,
-        impute_info = working_dir + 'resources/battenberg/impute_info.txt'
+        workdir = working_dir + 'resources/battenberg/battenberg_impute_v3'
     shell: '''
-    cat {input.impute_00} | sed 's#<path_to_impute_reference_files>#{params.workdir}#g' > {params.impute_info}
+    cat {input.impute_00} | sed 's#<path_to_impute_reference_files>#{params.workdir}#g' > {output.impute_info}
     '''
 
 # 4.3 preprocessing steps (Battenberg and ASCAT.sc) before panConusig
@@ -200,6 +200,7 @@ rule panConusig_preprocessing:
     output:
         as_cna_out = results + '{sample}/06_panConusig/ASCAT_out/{sample}_as_cna_profile.tsv'
     params:
+        workdir = working_dir,
         sampleID = '{sample}',
         impute_ref_dir = working_dir + 'resources/battenberg',
         beagle_ref_dir = working_dir + 'resources/battenberg/beagle',
