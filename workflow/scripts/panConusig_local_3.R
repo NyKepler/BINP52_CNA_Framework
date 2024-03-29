@@ -14,7 +14,7 @@ sample_df <- read.csv('/home/researcher/TangGY/BINP52/Workflow/Draft/config/samp
 # prepare the input matrix
 in_mat <- data.frame(matrix(ncol = 6, nrow = 0))
 colnames(in_mat) <- c('sample', 'chr', 'startpos', 'endpos', 'nMajor', 'nMinor')
-for (sampleID in c('CS2_176','CS3_15')) {
+for (sampleID in sample_df$Sample) {
   cna_profile <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/ASCAT_out/",sampleID,"_as_cna_profile.tsv")
   # cna_profile <- paste0('panConusig/',sampleID,'_as_cna_profile.tsv')
   df <- read.csv(cna_profile, sep = '\t')
@@ -29,6 +29,7 @@ SC_mat <- panConusig::getMatrix(in_mat)
 # save the sample-by-component matrix
 ## output directory
 out_dir <- "/home/researcher/TangGY/BINP52/Workflow/Draft/results/signatures/panConusig/"
+dir.create(out_dir)
 # out_dir <- "panConusig/"
 output_prefix <- paste0(out_dir, 'panConusig')
 saveRDS(SC_mat, file = paste0(output_prefix, '.SCmatrix.rds'), compress = FALSE)
@@ -39,7 +40,7 @@ write.table(SC_mat_out, file = paste0(output_prefix, '.SCmatrix.txt'), sep = '\t
 
 # apply cosine similarity to find the closest signature for each sample
 ## load the reference signature-by-component matrix
-ref_input <- '/home/researcher/TangGY/BINP52/Workflow/Draft/resources/panConusig_id.txt'
+ref_input <- '/home/researcher/TangGY/BINP52/Workflow/Draft/resources/Panconusig_id.txt'
 # ref_input <- 'panConusig/Panconusig_id.txt'
 ref_mat <- read.csv(ref_input, sep = '\t', row.names = 1)
 panConusig_sig <- colnames(ref_mat)
@@ -77,3 +78,5 @@ SSmatrix <- SSmatrix %>% select('sample', 'enrich', 'CN1':'CN25')
 row.names(SSmatrix) <- 1:nrow(SSmatrix)
 write.table(SSmatrix, file = paste0(output_prefix,'.SSmatrix.tsv'), sep = '\t', row.names = FALSE, col.names = TRUE, quote = FALSE)
 saveRDS(SSmatrix, file = paste0(output_prefix, '.SSmatrix.rds'), compress = FALSE)
+
+print('Step 3. panConusig finished.')
