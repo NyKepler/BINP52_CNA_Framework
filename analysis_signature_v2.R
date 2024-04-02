@@ -21,6 +21,7 @@ groups <- c('ArchivalVS','MaNiLaVS','ffTumor','ffTissue','Endome','ffpe','Blood'
 ## for panConusig, only ffTumor samples ran the analysis
 # load the sample table
 sample_df <- read.table('E:/1Lund_Lectures/BINP52_MasterProject/Workflow/Draft/results/solutions/solution_sample.tsv', sep = '\t', header = 1) %>% select('Sample', 'Patient', 'Type', 'Group')
+# sample_df <- read.csv('E:/1Lund_Lectures/BINP52_MasterProject/Workflow/Draft/Snakemake2/config/solution_sample.tsv', sep = '\t') %>% select('Sample','Patient','Type','Group','Ploidy','Cellularity')
 sample_sheet <- readxl::read_excel('MaNiLa_All_samplesheet_240311_groups.xlsx',sheet = 'Samples')
 ## combine the benign and HGSC information with the samples
 sample_df$BH <- NA
@@ -503,7 +504,36 @@ write.xlsx(CN_out, file = 'All_sample_signature.xlsx', sheetName = 'CN', append 
 # CN signature stats
 CN_stat <- read.xlsx('All_sample_signature.xlsx',sheetName = 'CN')
 
-## 1. distribution of the delta-value
+## 1. differences in ploidy and cellularity
+for (sampleID in sample_df$Sample) {
+  if (!(sampleID %in% CN_stat$sample)) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_CN_1'] <- NA
+  } else if (sampleID %in% CN_stat$sample) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_CN_1'] <- CN_stat[which(CN_stat$sample==sampleID),'enrich_CN_1']
+  }
+}
+sample_df$Group <- factor(sample_df$Group, levels = groups)
+### plotting
+ploidy_plot <-  ggboxplot(sample_df, x='Group', y='Ploidy', 
+                          color = 'black', fill = 'enrich_CN_1', palette = 'Paired', 
+                          xlab = 'Group', ylab = 'Ploidy') +
+  theme_classic()
+ploidy_plot <- ploidy_plot + labs(fill = 'CN signatures')
+ggsave('Brenton/Figures/CN_ploidy_all.pdf', plot = ploidy_plot, dpi = 600, width = 10, height = 7, units = 'in')
+cellularity_plot <-  ggboxplot(sample_df, x='Group', y='Cellularity', 
+                               color = 'black', fill = 'enrich_CN_1', palette = 'Paired', 
+                               xlab = 'Group', ylab = 'Cellularity') +
+  theme_classic()
+cellularity_plot <- cellularity_plot + labs(fill = 'CN signatures')
+ggsave('Brenton/Figures/CN_cellularity_all.pdf', plot = cellularity_plot, dpi = 600, width = 10, height = 7, units = 'in') 
+### stats analysis
+sub_df <- sample_df %>% filter(Group=='ffTumor' & !is.na(enrich_PanCan_1))
+# ploidy
+kruskal.test(sub_df$Ploidy~sub_df$enrich_CN_1, data = sub_df) # p = 0.26
+# cellularity
+kruskal.test(sub_df$Cellularity~sub_df$enrich_CN_1, data = sub_df) # p = 0.09
+
+## 2. distribution of the delta-value
 CN_dist_delta_plot <- dis_plot_delta(CN_stat)
 ggsave(filename = 'Brenton/Figures/delta_val_dist.pdf', plot = CN_dist_delta_plot, dpi = 600, width = 10, height = 7, units = 'in')
 quantile(CN_stat$delta_val, 0.1) # 0.079 top 10%
@@ -579,9 +609,7 @@ ggsave('Brenton/Figures/CN_sig_BH_cut_2.pdf', plot = CN_enrich_plot_2, dpi = 600
 write_xlsx(CN_info_df_cut, path = 'CN_group_cut_2.xlsx')
 
 
-
-
-## 2. exposure distribution
+## 3. exposure distribution
 ### rank by group
 CN_color_bar_group <- color_bar_prep(stat_df = CN_stat, exposure_df = CN_exposure, grouping_type = 'groups', sig_type = 'CN', sort = TRUE)
 CN_exposure_plot_group <- plot_exposure(stat_df = CN_stat, exposure_df = CN_exposure, grouping_type = 'groups', sig_type = 'CN', sort = TRUE)
@@ -602,7 +630,7 @@ CN_exposure_plot_BH_AVS <- plot_exposure(stat_df = CN_archival_stat, exposure_df
 CN_exposure_plot_BH_AVS <- CN_exposure_plot_BH_AVS %>% insert_bottom(CN_color_bar_BH_AVS, height = 0.03)
 ggsave(filename = 'Brenton/Figures/exposure_plot_BH_AVS.pdf', plot = CN_exposure_plot_BH, dpi = 600, width = 30, height = 7, units = 'in')
 
-## 3. CN signatures enrichment
+## 4. CN signatures enrichment
 ### in this part, combine ffTumor and ffTissue into ffTissue
 groups2 <- c('ArchivalVS','MaNiLaVS','ffTissue','Endome','ffpe','Blood','ffPlasma')
 #### top 1 enrich signature
@@ -634,7 +662,7 @@ ggsave('Brenton/Figures/CN_sig_BH_all_2.pdf', plot = CN_enrich_plot_2, dpi = 600
 write_xlsx(CN_info_df, path = 'CN_group_2.xlsx')
 
 
-## 4. VS samples time point exposure
+## 5. VS samples time point exposure
 VS_sheet <- read.xlsx(file = 'MaNiLa_All_samplesheet_240311_groups.xlsx', sheetName = 'VS_samples')
 VS_stat <- CN_stat[which(CN_stat$group=='ArchivalVS' | CN_stat$group=='MaNiLaVS'),]
 for (sampleID in VS_stat$sample) {
@@ -726,7 +754,7 @@ HGSC_VS_plot <- ggarrange(pre_6_HGSC_exposure_plot, pre_0_HGSC_exposure_plot, di
 ggsave('Brenton/Figures/HGSC_VS_exposure.pdf', plot = HGSC_VS_plot, dpi = 600, width = 10, height = 5, units = 'in')
 
 
-## 5. reference exposure plots
+## 6. reference exposure plots
 #### HGSC ffTumor 
 HGSC_tumor_indices <- which(CN_stat$group=='ffTumor' & CN_stat$BH=='HGSC')
 HGSC_tumor_mat <- CN_mat[HGSC_tumor_indices,]
@@ -796,7 +824,39 @@ write.xlsx(PanCan_out, file = 'All_sample_signature.xlsx', sheetName = 'Pan_Canc
 
 # PanCan signature stats
 PanCan_stat <- read.xlsx('All_sample_signature.xlsx',sheetName = 'Pan_Cancer')
-## 1. distribution of the delta-value
+
+## 1. differences in ploidy and cellularity
+for (sampleID in sample_df$Sample) {
+  if (!(sampleID %in% PanCan_stat$sample)) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_PanCan_1'] <- NA
+  } else if (sampleID %in% PanCan_stat$sample) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_PanCan_1'] <- PanCan_stat[which(PanCan_stat$sample==sampleID),'enrich_PanCan_1']
+  }
+}
+PanCan_sample_df <- sample_df %>% filter(!is.na(enrich_PanCan_1))
+PanCan_sample_df$Group <- factor(PanCan_sample_df$Group, levels = groups)
+PanCan_sample_df$enrich_PanCan_1 <- factor(PanCan_sample_df$enrich_PanCan_1, levels = c('CX1','CX2','CX3','CX5','CX15','CX17'))
+### plotting
+ploidy_plot <-  ggboxplot(PanCan_sample_df, x='Group', y='Ploidy', 
+                          color = 'black', fill = 'enrich_PanCan_1', palette = 'Paired', 
+                          xlab = 'Group', ylab = 'Ploidy') +
+  theme_classic()
+ploidy_plot <- ploidy_plot + labs(fill = 'pan-cancer signatures')
+ggsave('Pan-Cancer/Figures/PanCan_ploidy_all.pdf', plot = ploidy_plot, dpi = 600, width = 10, height = 7, units = 'in')
+cellularity_plot <-  ggboxplot(PanCan_sample_df, x='Group', y='Cellularity', 
+                               color = 'black', fill = 'enrich_PanCan_1', palette = 'Paired', 
+                               xlab = 'Group', ylab = 'Cellularity') +
+  theme_classic()
+cellularity_plot <- cellularity_plot + labs(fill = 'pan-cancer signatures')
+ggsave('Pan-Cancer/Figures/PanCan_cellularity_all.pdf', plot = cellularity_plot, dpi = 600, width = 10, height = 7, units = 'in') 
+### stats analysis
+sub_df <- PanCan_sample_df %>% filter(Group=='ffTumor')
+# ploidy
+kruskal.test(sub_df$Ploidy~sub_df$enrich_PanCan_1, data = sub_df) # p = 0.84
+# cellularity
+kruskal.test(sub_df$Cellularity~sub_df$enrich_PanCan_1, data = sub_df) # p = 0.08
+
+## 2. distribution of the delta-value
 PanCan_dist_delta_plot <- dis_plot_delta(PanCan_stat)
 ggsave(filename = 'Pan-Cancer/Figures/delta_val_dist.pdf', plot = PanCan_dist_delta_plot, dpi = 600, width = 10, height = 7, units = 'in')
 quantile(PanCan_stat$delta_val, 0.1) # 0.016 top 10%
@@ -875,9 +935,7 @@ ggsave('Pan-Cancer/Figures/PanCan_sig_BH_cut_2.pdf', plot = PanCan_enrich_plot_2
 write_xlsx(PanCan_info_df_cut, path = 'PanCan_group_cut_2.xlsx')
 
 
-
-
-## 2. exposure distribution
+## 3. exposure distribution
 ### rank by group
 PanCan_color_bar_group <- color_bar_prep(stat_df = PanCan_stat, exposure_df = PanCan_exposure, grouping_type = 'groups', sig_type = 'Pan-Cancer', sort = TRUE)
 PanCan_exposure_plot_group <- plot_exposure(stat_df = PanCan_stat, exposure_df = PanCan_exposure, grouping_type = 'groups', sig_type = 'Pan-Cancer', sort = TRUE)
@@ -898,7 +956,7 @@ PanCan_exposure_plot_BH_AVS <- plot_exposure(stat_df = PanCan_archival_stat, exp
 PanCan_exposure_plot_BH_AVS <- PanCan_exposure_plot_BH_AVS %>% insert_bottom(PanCan_color_bar_BH_AVS, height = 0.03)
 ggsave(filename = 'Pan-Cancer/Figures/exposure_plot_BH_AVS.pdf', plot = PanCan_exposure_plot_BH_AVS, dpi = 600, width = 30, height = 7, units = 'in')
 
-## 3. PanCan signatures enrichment
+## 4. PanCan signatures enrichment
 ### in this part, combine ffTumor and ffTissue into ffTissue
 groups2 <- c('ArchivalVS','MaNiLaVS','ffTissue','Endome','ffpe','Blood','ffPlasma')
 
@@ -931,7 +989,7 @@ ggsave('Pan-Cancer/Figures/PanCan_sig_BH_all_2.pdf', plot = PanCan_enrich_plot_2
 write_xlsx(PanCan_info_df, path = 'PanCan_group_2.xlsx')
 
 
-## 4. VS samples time point exposure
+## 5. VS samples time point exposure
 VS_sheet <- read.xlsx(file = 'MaNiLa_All_samplesheet_240311_groups.xlsx', sheetName = 'VS_samples')
 VS_stat <- PanCan_stat[which(PanCan_stat$group=='ArchivalVS' | PanCan_stat$group=='MaNiLaVS'),]
 for (sampleID in VS_stat$sample) {
@@ -1008,7 +1066,7 @@ diag_HGSC_exposure_plot <- VS_exposure_plot(VS_exposure_df = diag_HGSC_exposure,
 HGSC_VS_plot <- ggarrange(pre_6_HGSC_exposure_plot, pre_0_HGSC_exposure_plot, diag_HGSC_exposure_plot, ncol = 3, common.legend = 1, legend.grob = get_legend(pre_0_HGSC_exposure_plot), legend = 'right')
 ggsave('Pan-Cancer/Figures/HGSC_VS_exposure.pdf', plot = HGSC_VS_plot, dpi = 600, width = 10, height = 5, units = 'in')
 
-## 5. reference exposure plots
+## 6. reference exposure plots
 #### HGSC ffTumor 
 HGSC_tumor_indices <- which(PanCan_stat$group=='ffTumor' & PanCan_stat$BH=='HGSC')
 HGSC_tumor_mat <- PanCan_mat[HGSC_tumor_indices,]
@@ -1080,6 +1138,38 @@ write.xlsx(panConusig_out, file = 'All_sample_signature.xlsx', sheetName = 'panC
 
 # panConusig signature stats
 panConusig_stat <- read.xlsx('All_sample_signature.xlsx',sheetName = 'panConusig')
+
+## 1. differences in ploidy and cellularity
+for (sampleID in sample_df$Sample) {
+  if (!(sampleID %in% panConusig_stat$sample)) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_panConusig_1'] <- NA
+  } else if (sampleID %in% panConusig_stat$sample) {
+    sample_df[which(sample_df$Sample==sampleID),'enrich_panConusig_1'] <- panConusig_stat[which(panConusig_stat$sample==sampleID),'enrich_panConusig_1']
+  }
+}
+panConusig_sample_df <- sample_df %>% filter(!is.na(enrich_panConusig_1))
+panConusig_sample_df$Group <- factor(panConusig_sample_df$Group, levels = groups)
+panConusig_sample_df$enrich_panConusig_1 <- factor(panConusig_sample_df$enrich_panConusig_1, levels = c('CN1','CN2','CN7','CN9','CN19','CN20','CN21','CN23'))
+### plotting
+ploidy_plot <-  ggboxplot(panConusig_sample_df, x='Group', y='Ploidy', 
+                          color = 'black', fill = 'enrich_panConusig_1', palette = 'Paired', 
+                          xlab = 'Group', ylab = 'Ploidy') +
+  theme_classic()
+ploidy_plot <- ploidy_plot + labs(fill = 'panConusig signatures')
+ggsave('panConusig/Figures/panConusig_ploidy_all.pdf', plot = ploidy_plot, dpi = 600, width = 10, height = 7, units = 'in')
+cellularity_plot <-  ggboxplot(panConusig_sample_df, x='Group', y='Cellularity', 
+                               color = 'black', fill = 'enrich_panConusig_1', palette = 'Paired', 
+                               xlab = 'Group', ylab = 'Cellularity') +
+  theme_classic()
+cellularity_plot <- cellularity_plot + labs(fill = 'panConusig signatures')
+ggsave('panConusig/Figures/panConusig_cellularity_all.pdf', plot = cellularity_plot, dpi = 600, width = 10, height = 7, units = 'in') 
+### stats analysis
+sub_df <- panConusig_sample_df %>% filter(Group=='ffTumor')
+# ploidy
+kruskal.test(sub_df$Ploidy~sub_df$enrich_panConusig_1, data = sub_df) # p = 0.13
+# cellularity
+kruskal.test(sub_df$Cellularity~sub_df$enrich_panConusig_1, data = sub_df) # p = 0.17
+
 ## 1. distribution of the delta-value
 panConusig_dist_delta_plot <- dis_plot_delta(panConusig_stat)
 ggsave(filename = 'panConusig/Figures/delta_val_dist.pdf', plot = panConusig_dist_delta_plot, dpi = 600, width = 10, height = 7, units = 'in')
