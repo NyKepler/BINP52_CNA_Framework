@@ -4,7 +4,7 @@
 
 import pandas as pd
 
-from scripts.common import get_output_absolute, get_ref_battenberg, get_ref_beagle, get_cna_profile
+from scripts.common import get_output_absolute
 
 # specify the configuration file
 configfile: "config/config.yaml"
@@ -32,8 +32,7 @@ The final output of this workflow should be the signature similarity matrix for 
 rule all:
     input:
         CN_sig_SS = results + 'signatures/CN_sig/CN_sig.SSmatrix.rds',
-        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds',
-        panConusig_SS = results + 'signatures/panConusig/panConusig.SSmatrix.rds'
+        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds'
 
 
 ########## 1 Absolute copy number profiles ####################
@@ -165,63 +164,7 @@ rule PanCan_sig:
     script: 'scripts/PanCan_sig.R'
 
 
-########## 4 panConusig ####################
-"""
-The final output for this part should be the sample-by-component matrix for panConusig.
-"""
-# 4.1 prepare the environment (for Battenberg, ASCAT.sc and panConusig packages)
-rule panConusig_env:
-    output:
-        "log/panConusig_settle_info.txt"
-    conda: 'envs/panConusig.yaml'
-    script: 'scripts/panConusig_env.R'
 
-# 4.2 prepare the reference files for Battenberg and the tool beagle5
-rule panConusig_ref_prep:
-    input:
-        env_set = "log/panConusig_settle_info.txt",
-        impute_00 = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info00.txt',
-        ref_battenberg = get_ref_battenberg(working_dir),
-        ref_beagle = get_ref_beagle(working_dir)
-    output:
-        impute_info = working_dir + 'resources/battenberg/battenberg_impute_v3/impute_info.txt'
-    params:
-        workdir = working_dir + 'resources/battenberg/battenberg_impute_v3'
-    shell: '''
-    cat {input.impute_00} | sed 's#<path_to_impute_reference_files>#{params.workdir}#g' > {output.impute_info}
-    '''
-
-# 4.3 preprocessing steps (Battenberg and ASCAT.sc) before panConusig
-rule panConusig_preprocessing:
-    input: 
-        ref_files = rules.panConusig_ref_prep.output,
-        usr_battenberg = "workflow/scripts/usr_battenberg.R",
-        bam_file = results + '{sample}/03_clean_up/{sample}.sorted.dedup.bam'
-    output:
-        as_cna_out = results + '{sample}/06_panConusig/ASCAT_out/{sample}_as_cna_profile.tsv'
-    params:
-        workdir = working_dir,
-        sampleID = '{sample}',
-        impute_ref_dir = working_dir + 'resources/battenberg',
-        beagle_ref_dir = working_dir + 'resources/battenberg/beagle',
-        result_dir = results + '{sample}/06_panConusig/',
-        ASCAT_outdir = results + '{sample}/06_panConusig/ASCAT_out/',
-        binsize = lambda wildcards: sample_df.loc[wildcards.sample, 'Binsize']
-    threads: config['battenberg_threads']
-    conda: 'envs/panConusig.yaml'
-    script: 'scripts/panConusig_preprocess.R'
-
-# 4.4 generating the panConusig
-rule panConusig_sig:
-    input:
-        cna_profiles = get_cna_profile(sample_df, results)
-    output:
-        panConusig_SS = results + 'signatures/panConusig/panConusig.SSmatrix.rds'
-    params:
-        def_SC = 'resources/panConusig_id.txt',
-        outdir = results + 'signatures/panConusig/'
-    conda: 'envs/panConusig.yaml'
-    script: 'scripts/panConusig.R'
 
 
 

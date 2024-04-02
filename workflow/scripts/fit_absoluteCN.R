@@ -31,6 +31,9 @@ sample_ID <- snakemake@params[['sample']]
 bins <- sample_df[which(sample_df$Sample == sample_ID), 'Binsize']
 ploidy <- as.numeric(sample_df[which(sample_df$Sample == sample_ID), 'Ploidy'])
 cellularity <- as.numeric(sample_df[which(sample_df$Sample == sample_ID), 'Cellularity'])
+if (cellularity == 0) {
+  cellularity <- 1
+}
 rds <- sample_df[which(sample_df$Sample == sample_ID), 'rds']
 
 ####### 2. Calculate Absolute Copy Number #######
@@ -73,12 +76,12 @@ if (any(class(copy_number) == "data.frame")) {
 
 # absolute copy number calculation
 sample_copy_number <- copy_number_for_sample(copy_number, sample = paste0(sample_ID, '.sorted.dedup'))
-relative_copy_number <- mutate(sample_copy_number, across(c(copy_number, segmented), ~ . / median(segmented, na.rm = TRUE)))
-segments <- copy_number_segments(relative_copy_number)
-absolute_copy_number <- mutate(relative_copy_number, 
+#relative_copy_number <- mutate(sample_copy_number, across(c(copy_number, segmented), ~ . / median(segmented, na.rm = TRUE)))
+segments <- copy_number_segments(sample_copy_number)
+absolute_copy_number <- mutate(sample_copy_number, 
                                across(c(copy_number, segmented),
                                       relative_to_absolute_copy_number, ploidy, cellularity))
-absolute_segments <- copy_number_segments(absolute_copy_number)
+absolute_segments <- mutate(segments, copy_number = relative_to_absolute_copy_number(copy_number, ploidy, cellularity))
 # rename the column and add the sample column
 absolute_copy_number <- rename(absolute_copy_number, c('segVal'='segmented'))
 absolute_copy_number['sample'] <- sample_ID
@@ -90,10 +93,4 @@ output_CN <- paste0(outdir, sample_ID, '_', bins, 'kb_CN.tsv')
 write.table(absolute_copy_number, file = output_CN, row.names = FALSE, sep = '\t', quote = FALSE)
 output_seg <- paste0(outdir, sample_ID, '_', bins, 'kb_seg.tsv')
 write.table(absolute_segments, file = output_seg, row.names = FALSE, sep = '\t', quote = FALSE)
-
-
-
-
-
-
 
