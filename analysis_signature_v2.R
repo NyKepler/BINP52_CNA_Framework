@@ -1139,6 +1139,17 @@ write.xlsx(panConusig_out, file = 'All_sample_signature.xlsx', sheetName = 'panC
 # panConusig signature stats
 panConusig_stat <- read.xlsx('All_sample_signature.xlsx',sheetName = 'panConusig')
 
+# basic information
+for (sampleID in df$Sample) {
+  df[which(df$Sample==sampleID),'BH'] <- sample_df[which(sample_df$Sample==sampleID),'BH']
+}
+for (BH in c('Benign','RRSO','HGSC')) {
+  print(BH)
+  a <- df[which(df$BH==BH),] %>% count(Patient)
+  print(a)
+}
+
+
 ## 1. differences in ploidy and cellularity
 for (sampleID in sample_df$Sample) {
   if (!(sampleID %in% panConusig_stat$sample)) {
