@@ -634,7 +634,7 @@ This step will generate the sample-by-component matrix and the sample-by-signatu
  - r-battenberg=2.2.10
  - r-panConusig=0.1.0
 ```
-Firstly, we apply preprocessing on BAM files (generated in *Part I Solutions*) to derive allele frequency files and phased haplotype data by using modified `Battenberg`. Instead of running all the remaining steps, the package was adapted to only producing the files we needed, which were the first two steps in the original function (see `workflow/scripts/usr_battenberg_pair.R`).  
+Firstly, we apply preprocessing on BAM files (generated in *Part I Solutions*) to derive allele frequency files and phased haplotype data by using modified `Battenberg`. Instead of running all the remaining steps, the package was adapted to only producing the files we needed, which were the first two steps in the original function (see `workflow/scripts/usr_battenberg_pair.R`). Besides, the filter on read depth is also changed to 2. The default value was 10, which was too large for our sWGS samples.  
 This step will take approximately an hour for each sample.  
 Below is example for running on one sample: (see `workflow/scripts/panConusig_pair_local_1.R` for details)
 ```
