@@ -4,8 +4,6 @@
 
 # Description: this is used to set up the environment with required packages to do the panConusig analysis.
 
-sink(file = snakemake@output[[1]])
-
 # Battenburg and ASCAT.sc
 BiocManager::install(c( "minfi", "conumee", "Rsamtools", "igordot/copynumber"), update = TRUE, ask = FALSE) # "copynumber"
 
@@ -18,6 +16,3 @@ devtools::install_github("UCL-Research-Department-of-Pathology/panConusig")
 library(Battenberg)
 library(ASCAT.sc)
 library(panConusig)
-
-print("build-up required environment for panConusig validation!")
-sink(file = NULL)

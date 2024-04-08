@@ -41,9 +41,9 @@ Rascal:
 
 
 
-###### Settting for the second part of the workflow #######
+###### Settings for the second part of the workflow #######
 # specify the tsv file contaning samples and their relative copy number solutions derived from the first part of the workflow (Snakefile_solution.smk)
-samp_solutions: 'config/solution_tumor.tsv'
+samp_solutions: 'config/solution_sample.tsv'
 
 # path to the cnsignature scripts
 cnsig_path: 'workflow/scripts/cnsignatures/'
@@ -54,8 +54,7 @@ supple_folder: 'resources/PanCan/'
 ## the required supplement table
 supple_tab: 'resources/PanCan/Supplementary Tables 15-22.xlsx'
 
-# specify the threads for Battenberg to run
-battenberg_threads: 30
+
 
 
 
