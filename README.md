@@ -19,9 +19,28 @@ The version of tools and packages to be used will be specified in each step (see
 - (7) Comparison with the recent HGSC signatures (n=7). The functions should be loaded from the github repository: https://bitbucket.org/britroc/cnsignatures.git .
 - (8) Comparison with the Pan-Cancer signatures (n=17). The package `CINSignatureQuantification` will be used to generate the samply-by-component matrix for the Pan-Cancer chromosomal instability signatures.
 - (9) Comparison with the panConusig signatures (n=25). Tools including `Battenberg` (`alleleCounter`, `impute2` and `beagle5` were included in this package), `ASCAT.sc` and `panConusig` will be used in this step.  
+  
 ![pipeline](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/pipeline.jpg)
 
 ### 1.3 Structure and descriptions
+`config` folder contains the `config.yaml` file used for the Snakemake workflow as well as the example input sample sheets.  
+- `sample_1.tsv`, `sample_2.tsv` and `sample_pair_3.tsv` is the example input for *Part I*, *Part II* and *Part III*, respectively.  
+  
+`Data` folder can be a place to store the fastq files.  
+`resources` folder contains all the reference files required for running the workflow.  
+- `BinAnnotations` folder contains the modified QDNAseq bin annotations.  
+- `feat_sig_mat.rds` is the signature-by-component definition matrix for HGSC CN signatures.  
+- `PanCan.xlsx` and `PanCan_def.rds` are both the signature-by-component definition matrix for pan-cancer CIN signatures.  
+- `Panconusig_id.txt` and `panConusig_def.rds` are both the signature-by-component definition matrix for panConusig signatures.  
+- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead.  
+
+`Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
+- `get_sample.py` was used to generate the input sample sheet for *Part I Solutions*.  
+- `preprocess_stat.R` was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
+- `All_Sample_Solutions.py` was used to extract the solutions (ploidy and cellularity) from *Part I Solutions* for each sample under different bin sizes.  
+- `solution_stat.R` was used to analyze the solution outputs from *Part I Solutions*.  
+- `get_solutions_samptab.R` was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
+- `select_tab.R` was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
 
 
 ## 2. Operation guide
@@ -53,9 +72,6 @@ cat resources/battenberg/battenberg_impute_v3/impute_info00.txt | sed 's#<path_t
 
 # Secondly, we need to build up the environment with required dependencies
 Rscript workflow/scripts/panConusig_env.R
-
-# Thirdly, we need to make modifications to fit our data.
-Rscript workflow/scripts/usr_battenberg_pair.R
 
 # Then, run panConusig generation step by step.
 # Please remember to change the directories in the scripts to adapt to the user situation

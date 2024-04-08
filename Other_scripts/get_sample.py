@@ -16,7 +16,7 @@ List of functions:
 
 
 Steps:
-1. generate a list to install all the unique types of samples
+1. generate a list to contain all the unique types of samples
 2. each unique type will create a sample tsv file
 3. match the type with sample metadata to derive their libraries, use the libraries to seach for their reads
 4. collect the paths and filenames of the reads, and output to sample tsv files 
