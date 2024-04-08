@@ -1,6 +1,6 @@
 # README for the CNA Framework
 Author: Guyuan Tang  
-Date: 2023/10/16 - 
+Date: 2023/10/16 - 2024/04/08
 
 ## 1. Description 
 ### 1.1 The project
@@ -25,7 +25,7 @@ The version of tools and packages to be used will be specified in each step (see
 
 
 ## 2. Operation guide
-### 2.1 Workflow *Part I* Solutions
+### 2.1 Workflow *Part I Solutions* 
 ```
 # activate the conda environment installing snakemake
 conda activate snakemake
@@ -34,7 +34,7 @@ cd <path to the downloaded github repository>
 # run the pipeline, for example, 30 threads
 snakemake --use-conda --configfile config/config.yaml --cores 30 --snakefile workflow/Snakefile_solution.smk
 ```
-### 2.2 Workflow *Part II* Signatures
+### 2.2 Workflow *Part II Signatures* 
 Note: this step works for HGSC CN signatures as well as pan-cancer CIN signatures, but not includes the panConusig signatures.
 ```
 # activate the conda environment installing snakemake
@@ -44,7 +44,7 @@ cd <path to the downloaded github repository>
 # run the pipeline, for example, 30 threads
 snakemake --use-conda --configfile config/config.yaml --cores 30 --snakefile workflow/Snakefile_CNsig.smk
 ```
-### 2.3 Workflow *Part III* panConusig
+### 2.3 Workflow *Part III panConusig* 
 Note: for panConusig, it would be better to run on local environment instead of within the Snakemake pipeline to aviod dependency conflicts (such as Java).  
 Please see the suggested installation in section 3.3.
 ```
