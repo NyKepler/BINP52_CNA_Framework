@@ -22,7 +22,7 @@ if results[-1] != '/':
 # specify the sample information
 sample_df = (pd.read_csv(config['samp_solutions'], 
     sep='\t',
-    dtype={'Sample':str, 'Patient':str, 'Type':str, 'Group':str, 'Binsize':str, 'rds':str, 'Ploidy':float, 'Cellularity':float})
+    dtype={'Sample':str, 'Binsize':str, 'rds':str, 'Ploidy':float, 'Cellularity':float})
     .set_index('Sample', drop=False))
 
 # specify the final output of the workflow

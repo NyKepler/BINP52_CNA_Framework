@@ -21,13 +21,7 @@ for (sampleID in sample_df$Sample) {
   # set the working directory
   working_dir <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/")
   setwd(working_dir)
-  # remove the files that are not required
-  for (chr in 1:22) {
-    hMutBAF <- paste0(sampleID,'_chr',chr,'_heterozygousMutBAFs_haplotyped.txt')
-    if (file.exists(hMutBAF)) {
-      file.remove(hMutBAF) 
-    }
-  }
+  
   # run ASCAT.sc
   ASCAT_out <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/ASCAT_out/")
   dir.create(ASCAT_out)

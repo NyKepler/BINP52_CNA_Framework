@@ -16,7 +16,6 @@ in_mat <- data.frame(matrix(ncol = 6, nrow = 0))
 colnames(in_mat) <- c('sample', 'chr', 'startpos', 'endpos', 'nMajor', 'nMinor')
 for (sampleID in sample_df$Sample) {
   cna_profile <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/ASCAT_out/",sampleID,"_as_cna_profile.tsv")
-  # cna_profile <- paste0('panConusig/',sampleID,'_as_cna_profile.tsv')
   df <- read.csv(cna_profile, sep = '\t')
   in_mat <- rbind(in_mat, df)
 }

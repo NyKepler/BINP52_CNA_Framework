@@ -4,12 +4,12 @@ Date: 2023/10/16 - 2024/04/08
 
 ## 1. Description 
 ### 1.1 The project
-This project is designed within a master thesis (BINP52). We aim to develop a pipeline to generate copy number profiles from shallow whole genome sequening (sWGS) samples.  
+This project is designed within a master thesis (BINP52). We aim to develop a pipeline to generate copy number profiles and detect copy number signatures from shallow whole genome sequening (sWGS) samples.  
 
 ### 1.2 The pipeline
-The `Snakemake (v7.32.4)` pipeline will include steps from preprocessing raw reads with QC to obtaining absolute copy number profiles. We designed two snakemake workflows, `Snakefile_solution.smk` and `Snakefile_CNsig.smk`, to include step 1-5 and 6-8, respectively.  
+The `Snakemake (v7.32.4)` pipeline will include steps from preprocessing raw reads to obtaining copy number signatures (HGSC CN signatures and pan-cancer CIN signatures). We designed two snakemake workflows, `Snakefile_solution.smk` and `Snakefile_CNsig.smk`, to include step 1-5 and 6-8, respectively. For step 9, we designed scripts `panConusig_pair_local.R` for detecting panConusig in local environment with required pair-sample sheet.  
 #### Steps
-The version of tools and packages to be used will be specified in each step (see chapter 2). The scripts within the pipeline are based on `Python (v3.11.6)` and `R (v4.3.2)`.
+The version of tools and packages to be used will be specified in each step (see chapter 3). The scripts within the pipeline are based on `Python (v3.11.6)` and `R (v4.3.2)`.
 - (1) Preprocessing. This step includes quality assessment and quality trimming on the raw reads. (`Fastp` will be used for QC and trimming, together with `fastqc` and `multiQC` to generate the QC reports.)
 - (2) Alignment. The human reference genome will be indexed. And the reads will be mapped to the reference genome. (`BWA` will be used for both indexing and alignment.)
 - (3) Clean-up. After alignment, the SAM files will be sorted and the PCR duplicates will be marked and removed. Also, the .sorted.deduplicated.sam will be converted to BAM files. The BAM files will be indexed for later analysis. (`Picard` will be used for sorting SAM, marking duplicates, removing duplicates and converting SAM to BAM. `samtools` will be used for generating the clean_up stats and for indexing the BAM files.)
@@ -24,7 +24,7 @@ The version of tools and packages to be used will be specified in each step (see
 
 ### 1.3 Structure and descriptions
 `config` folder contains the `config.yaml` file used for the Snakemake workflow as well as the example input sample sheets.  
-- `sample_1.tsv`, `sample_2.tsv` and `sample_pair_3.tsv` is the example input for *Part I*, *Part II* and *Part III*, respectively.  
+- `sample_1.tsv`, `sample_2.tsv` and `sample_pair_3.tsv` is the example input for *Part I*, *Part II* and *Part III*, respectively. All of them should be tab-separated files.  
   
 `Data` folder can be a place to store the fastq files.  
 `resources` folder contains all the reference files required for running the workflow.  
@@ -34,6 +34,7 @@ The version of tools and packages to be used will be specified in each step (see
 - `Panconusig_id.txt` and `panConusig_def.rds` are both the signature-by-component definition matrix for panConusig signatures.  
 - `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead.  
 
+`workflow` is the main folder containing Snakemake pipelines, environment setting yaml files, and scripts used by the workflow.  
 `Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
 - `get_sample.py` was used to generate the input sample sheet for *Part I Solutions*.  
 - `preprocess_stat.R` was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
@@ -64,8 +65,8 @@ cd <path to the downloaded github repository>
 snakemake --use-conda --configfile config/config.yaml --cores 30 --snakefile workflow/Snakefile_CNsig.smk
 ```
 ### 2.3 Workflow *Part III panConusig* 
-Note: for panConusig, it would be better to run on local environment instead of within the Snakemake pipeline to aviod dependency conflicts (such as Java).  
-Please see the suggested installation in section 3.3.
+Note: for panConusig, it requires "normal-tumor" pair, the sample sheet is different from other signatures (see example `config/sample_pair_3.tsv`). Furthermore, it starts again from the BAM files to generate allele-specific copy number profiles which are completely different from the other two signatures, so it is good to run separately. Besides, it would be better to run in local conda environment instead of within the Snakemake pipeline to aviod dependency conflicts (such as Java) as well as pathway errors of reference files.  
+Please see suggestion on setting up the environment in section 3.3.
 ```
 # Firstly, we need to add our local true working directory in the impute reference files
 cat resources/battenberg/battenberg_impute_v3/impute_info00.txt | sed 's#<path_to_impute_reference_files>#resources/battenberg/battenberg_impute_v3#g' > resources/battenberg/battenberg_impute_v3/impute_info.txt
@@ -82,10 +83,8 @@ Rscript workflow/scripts/panConusig_pair_local_3.R
 
 ## 3. Workflow Details
 ### 3.0 Sample tables generation
-We include a python script `get_sample.py` to help generate the sample.tsv for each type of samples from the provided xlsx file describing the samples. The final sample.tsv for each type will include the following columns:  
+We include a python script `get_sample.py` to help generate the sample.tsv (see example `config/sample_1.tsv`). The final sample.tsv for each type will include the following columns:  
 **sample_name**: the name of the sample (also the library)  
-**patient**: the patient ID  
-**type**: the sample type  
 **fastq_1** and **fastq_2**: the paths of the sequencing reads  
 The sample.tsv to be used in the workflow should be specified in the `config.yaml`.
 
@@ -416,7 +415,7 @@ rule rascal_solution:
 ### 3.2 Snakefile_CNsig
 After deciding the bin size for each group (30kb for ffTumor, ArchivalVS and MaNiLaVS, 100kb for ffpe, and 50kb for other groups), and selecting the optimal ploidy and cellularity for each sample, the second snakemake `Snakefile_CNsig.smk` was designed for the following analyzation.  
 
-The final outputs for this snakemake workflow would be the sample-by-signature matrix (calculated by cosine similarity based on the sample-by-component matrix) for each type of signature. 
+The final outputs for this snakemake workflow would be the sample-by-signature matrix (calculated by cosine similarity based on the sample-by-component matrix) for each type of signature (HGSC CN signatures and pan-cancer CIN signatures). 
 ```
 rule all:
     input:
@@ -596,7 +595,8 @@ rule PanCan_sig:
 
 ### 3.3 panConusig signatures
 This step will generate the sample-by-component matrix and the sample-by-signature matrix based on the recent published panConusig signatures (Steels *et al.,* 2022).  
-*Tools, Packages and Dependencies*
+*Tools, Packages and Dependencies*  
+(Suggestions on installing the dependencies are also described below.)
 ```
 # dependencies below are suggested to be installed in conda environment
  - r-base=4.3.3
@@ -634,3 +634,186 @@ This step will generate the sample-by-component matrix and the sample-by-signatu
  - r-battenberg=2.2.10
  - r-panConusig=0.1.0
 ```
+Firstly, we apply preprocessing on BAM files (generated in *Part I Solutions*) to derive allele frequency files and phased haplotype data by using modified `Battenberg`. Instead of running all the remaining steps, the package was adapted to only producing the files we needed, which were the first two steps in the original function (see `workflow/scripts/usr_battenberg_pair.R`).  
+This step will take approximately an hour for each sample.  
+Below is example for running on one sample: (see `workflow/scripts/panConusig_pair_local_1.R` for details)
+```
+# set the working directory
+working_dir <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/")
+dir.create(working_dir)
+setwd(working_dir)
+# load the parameters
+TUMOURNAME = sampleID
+NORMALNAME = sample_df[which(sample_df$Sample==sampleID),'Sample_ref']
+results_output = "/home/researcher/TangGY/BINP52/Workflow/Draft/results/"
+NORMALBAM = paste0(results_output,NORMALNAME,'/03_clean_up/',NORMALNAME,'.sorted.dedup.bam')
+TUMOURBAM = paste0(results_output,TUMOURNAME,'/03_clean_up/',TUMOURNAME,'.sorted.dedup.bam')
+IS.MALE = FALSE
+SKIP_ALLELECOUNTING = FALSE
+SKIP_PREPROCESSING = FALSE
+SKIP_PHASING = FALSE
+NTHREADS = 30
+PRIOR_BREAKPOINTS_FILE = NULL
+  
+analysis = "paired"
+  
+JAVAJRE = "java"
+ALLELECOUNTER = "alleleCounter"
+IMPUTE_EXE = "impute2"
+  
+GENOMEBUILD = "hg19"
+USEBEAGLE = T
+  
+# General static
+# location of the reference files
+if (GENOMEBUILD=="hg19") {
+    impute_basedir = "/home/researcher/TangGY/BINP52/Workflow/Draft/resources/battenberg"
+    IMPUTEINFOFILE = file.path(impute_basedir, "battenberg_impute_v3/impute_info.txt")
+    G1000ALLELESPREFIX = file.path(impute_basedir, "battenberg_1000genomesloci2012_v3/1000genomesAlleles2012_chr")
+    G1000LOCIPREFIX = file.path(impute_basedir, "battenberg_1000genomesloci2012_v3/1000genomesloci2012_chr")
+    GCCORRECTPREFIX = file.path(impute_basedir, "battenberg_wgs_gc_correction_1000g_v3/1000_genomes_GC_corr_chr_")
+    REPLICCORRECTPREFIX = file.path(impute_basedir, "battenberg_wgs_replic_correction_1000g_v3/1000_genomes_replication_timing_chr_")
+    
+    # WGS specific static
+    PROBLEMLOCI = file.path(impute_basedir, "probloci_270415.txt.gz")
+    GENOME_VERSION = "b37"
+    GENOMEBUILD = "hg19"
+    BEAGLE_BASEDIR = "/home/researcher/TangGY/BINP52/Workflow/Draft/resources/battenberg/beagle"
+    BEAGLEJAR = file.path(BEAGLE_BASEDIR, "beagle.22Jul22.46e.jar")
+    BEAGLEREF.template = file.path(BEAGLE_BASEDIR, GENOME_VERSION, "chrCHROMNAME.1kg.phase3.v5a.b37.bref3")
+    BEAGLEPLINK.template = file.path(BEAGLE_BASEDIR, GENOME_VERSION, "plink.chrCHROMNAME.GRCh37.map")
+    
+    CHROM_COORD_FILE = file.path(impute_basedir, "gcCorrect_chromosome_coordinates_hg19.txt")
+    
+    
+    PLATFORM_GAMMA = 1
+    PHASING_GAMMA = 1
+    SEGMENTATION_GAMMA = 10
+    SEGMENTATIIN_KMIN = 3
+    PHASING_KMIN = 1
+    CLONALITY_DIST_METRIC = 0
+    ASCAT_DIST_METRIC = 1
+    MIN_PLOIDY = 1.6
+    MAX_PLOIDY = 4.8
+    MIN_RHO = 0.1
+    MIN_GOODNESS_OF_FIT = 0.63
+    BALANCED_THRESHOLD = 0.51
+    MIN_NORMAL_DEPTH = 2 #default setting is 10 which is not suitable for sWGS, and for most positions, the good read depth is only 1
+    MIN_BASE_QUAL = 20
+    MIN_MAP_QUAL = 35
+    CALC_SEG_BAF_OPTION = 1
+  }
+# run battenberg
+battenberg_new(analysis=analysis,
+                tumourname=TUMOURNAME, 
+                normalname=NORMALNAME, 
+                tumour_data_file=TUMOURBAM, 
+                normal_data_file=NORMALBAM, 
+                ismale=IS.MALE, 
+                imputeinfofile=IMPUTEINFOFILE, 
+                g1000prefix=G1000LOCIPREFIX, 
+                g1000allelesprefix=G1000ALLELESPREFIX, 
+                gccorrectprefix=GCCORRECTPREFIX, 
+                repliccorrectprefix=REPLICCORRECTPREFIX, 
+                problemloci=PROBLEMLOCI, 
+                data_type="wgs",
+                impute_exe=IMPUTE_EXE,
+                allelecounter_exe=ALLELECOUNTER,
+                usebeagle=USEBEAGLE,
+                beaglejar=BEAGLEJAR,
+                beagleref=BEAGLEREF.template,
+                beagleplink=BEAGLEPLINK.template,
+                beaglemaxmem=10,
+                beaglenthreads=30,
+                beaglewindow=40,
+                beagleoverlap=4,
+                javajre=JAVAJRE,
+                nthreads=NTHREADS,
+                platform_gamma=PLATFORM_GAMMA,
+                phasing_gamma=PHASING_GAMMA,
+                segmentation_gamma=SEGMENTATION_GAMMA,
+                segmentation_kmin=SEGMENTATIIN_KMIN,
+                phasing_kmin=PHASING_KMIN,
+                clonality_dist_metric=CLONALITY_DIST_METRIC,
+                ascat_dist_metric=ASCAT_DIST_METRIC,
+                min_ploidy=MIN_PLOIDY,
+                max_ploidy=MAX_PLOIDY,
+                min_rho=MIN_RHO,
+                min_goodness=MIN_GOODNESS_OF_FIT,
+                uninformative_BAF_threshold=BALANCED_THRESHOLD,
+                min_normal_depth=MIN_NORMAL_DEPTH,
+                min_base_qual=MIN_BASE_QUAL,
+                min_map_qual=MIN_MAP_QUAL,
+                calc_seg_baf_option=CALC_SEG_BAF_OPTION,
+                skip_allele_counting=SKIP_ALLELECOUNTING,
+                skip_preprocessing=SKIP_PREPROCESSING,
+                skip_phasing=SKIP_PHASING,
+                prior_breakpoints_file=PRIOR_BREAKPOINTS_FILE,
+                GENOMEBUILD=GENOMEBUILD,
+                chrom_coord_file=CHROM_COORD_FILE)
+```
+
+Secondly, we run `ASCAT.sc` as suggested on the allele frequency files and phased haplotype data to calculate the segmented absolute allele-specific copy number profiles. The final output profiles will be adjusted to have the required column names for next step.  
+This step will take approximately 2 min for each sample.  
+Below is an example for running on one sample: (see `workflow/scripts/panConusig_pair_local_2.R` for details)
+```
+# set the working directory
+working_dir <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/")
+setwd(working_dir)
+
+# run ASCAT.sc
+ASCAT_out <- paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,"/06_panConusig/ASCAT_out/")
+dir.create(ASCAT_out)
+results_output = paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,'/06_panConusig/')
+## path to required files
+path_to_phases=lapply(sampleID, function(SAMPLENAME)
+  {
+    paste0(results_output, SAMPLENAME,
+           "_beagle5_output_chr",c(1:22),".txt.vcf.gz")
+  })
+  
+list_ac_counts_paths=lapply(sampleID, function(SAMPLENAME)
+  {
+    paste0(results_output, SAMPLENAME,
+           "_alleleFrequencies_chr",c(1:22),".txt")
+  })
+bins <- sample_df[which(sample_df$Sample==sampleID),'Binsize']
+bins <- as.numeric(bins) * 1000
+TUMOURBAM = paste0("/home/researcher/TangGY/BINP52/Workflow/Draft/results/",sampleID,'/03_clean_up/',sampleID,'.sorted.dedup.bam')
+## run the main programme
+res <- run_sc_sequencing(tumour_bams=TUMOURBAM,
+                        allchr=paste0("chr",c(1:22)),
+                        sex='female',
+                        binsize=bins,
+                        chrstring_bam="chr",
+                        purs = seq(0.01, 1, 0.001), #if start from 0, will affect the following operations
+                        ploidies = seq(1.7, 5, 0.01),
+                        maxtumourpsi=5,
+                        build="hg19",
+                        MC.CORES=30,
+                        outdir=ASCAT_out,
+                        projectname="ASCAT_CN",
+                        segmentation_alpha=0.01,
+                        path_to_phases=path_to_phases,
+                        list_ac_counts_paths=list_ac_counts_paths,
+                        predict_refit=TRUE,
+                        multipcf=FALSE)
+  
+## alter the format of the final output
+in_file <- paste0(ASCAT_out, 'as_cna_profile_', sampleID, '.sorted.dedup.bam_bam1.txt')
+df <- read.csv(in_file, sep = '\t')
+df$sample <- sampleID
+df <- df %>% select('sample', 'chr', 'startpos', 'endpos', 'nA', 'nB')
+colnames(df) <- c('sample', 'chr', 'startpos', 'endpos', 'nMajor', 'nMinor')
+# print the file
+write.table(df, file = paste0(ASCAT_out, sampleID, '_as_cna_profile.tsv'), quote = FALSE, sep = '\t', row.names = FALSE)
+```
+
+Finally, we used the outputs from the above step to extract the sample-by-component matrix as well as the samply-by-signature cosine similarity matrix (see `workflow/scripts/panConusig_pair_local_3.R` for details).
+
+## Acknowledgement
+
+
+## Other information
+If you have any questions towards the workflow, such as handling the reference files, please feel free to contact the author through email: gu5747ta-s@student.lu.se.  
+Any advice and questions are welcome. Thank you so much!

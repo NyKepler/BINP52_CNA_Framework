@@ -1,0 +1,8 @@
+Sample  Binsize Sample_ref
+CS1_5   30  CS1_15
+CS1_14  30  CS1_15
+CS1_31  30  CS1_15
+
+# Tab-separated
+# Must-have columns: Sample, Binsize, Sample_ref
+## Binsizes are represented with unit as kb.

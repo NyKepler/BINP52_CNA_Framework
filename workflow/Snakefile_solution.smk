@@ -10,7 +10,7 @@ configfile: "config/config.yaml"
 # specify the samples and their groups
 sample_df = (pd.read_csv(config['samples'], 
     sep='\t', 
-    dtype={'sample_name':str, 'patient':str, 'type':str, 'fastq_1':str, 'fastq_2':str})
+    dtype={'sample_name':str, 'fastq_1':str, 'fastq_2':str})
     .set_index('sample_name', drop=False))
 
 # specify the results location (output directory)
