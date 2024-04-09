@@ -812,7 +812,7 @@ write.table(df, file = paste0(ASCAT_out, sampleID, '_as_cna_profile.tsv'), quote
 Finally, we used the outputs from the above step to extract the sample-by-component matrix as well as the samply-by-signature cosine similarity matrix (see `workflow/scripts/panConusig_pair_local_3.R` for details).
 
 ## Acknowledgement
-
+Thanks a lot to all the support and advice from [Ingrid Lab](https://github.com/IngridHLab)!
 
 ## Other information
 If you have any questions towards the workflow, such as handling the reference files, please feel free to contact the author through email: gu5747ta-s@student.lu.se.  
