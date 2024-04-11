@@ -810,7 +810,12 @@ colnames(df) <- c('sample', 'chr', 'startpos', 'endpos', 'nMajor', 'nMinor')
 write.table(df, file = paste0(ASCAT_out, sampleID, '_as_cna_profile.tsv'), quote = FALSE, sep = '\t', row.names = FALSE)
 ```
 
-Finally, we used the outputs from the above step to extract the sample-by-component matrix as well as the samply-by-signature cosine similarity matrix (see `workflow/scripts/panConusig_pair_local_3.R` for details).
+Finally, we used the outputs from the above step to extract the sample-by-component matrix as well as the sample-by-signature cosine similarity matrix (see `workflow/scripts/panConusig_pair_local_3.R` for details).
+
+## 4. Signature Analysis
+After the workflow, we performed signature analyses on the sample-by-signature cosine similarity matrices for all three types of signatures. Code details can be found in `Other_scripts/analysis_signature.R`.
+- Firstly, we would like to investigate the signatures that shared most similar patterns with our samples. We excluded the samples with a second highest similarity less than 0.5. Then we calculated the delta values between the first and second highest similarities to identify how unique the most similar signatures were as well as how possible that the samples had two close signatures that may mask each other. We tested cut-offs at 0.1 and 0.25 on delta-values to select the best threshold for each type of samples.  
+- Secondly, we presented the signature similarities as exposure to identify the profile patterns. To focus on more similar signatures, we adjusted the similarities less than 0.5 into 0, and normalized all the values by dividing the sum of similarity for each sample.
 
 ## References
 1. Macintyre G, Goranova TE, De Silva D, Ennis D, Piskorz AM, Eldridge M, et al. Copy number signatures and mutational processes in ovarian carcinoma. Nat Genet. 2018 Sep;50(9):1262–70.  
