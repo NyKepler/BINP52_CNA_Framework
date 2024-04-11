@@ -1,0 +1,7 @@
+sample_name fastq_1 fastq_2
+CS1_5   /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_5_S5_R1_001.fastq.gz /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_5_S5_R2_001.fastq.gz
+CS1_14  /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_14_S14_R1_001.fastq.gz   /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_14_S14_R2_001.fastq.gz
+CS1_15  /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_15_S15_R1_001.fastq.gz   /home/researcher/TangGY/BINP52/Data/CTG_2021_047_SeqOnly/2021_047_DNA/fastq/MaNiLa_CS1/CS1_15_S15_R2_001.fastq.gz
+
+# Tab-separated
+# Must-have columns: sample_name, fastq_1, fastq_2

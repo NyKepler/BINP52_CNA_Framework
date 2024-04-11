@@ -19,7 +19,7 @@ dependencies:
  - r-doparallel=1.0.17
  - r-ggplot2=3.4.4
  - r-gtools=3.9.5
- - parallel=20170422(20240122)
+ - parallel=20170422
  - bioconductor-variantannotation=1.48.1
  - r-xgboost=2.0.3
  - bioconductor-genomicranges=1.54.1

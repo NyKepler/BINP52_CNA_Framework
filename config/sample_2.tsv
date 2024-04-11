@@ -1,0 +1,8 @@
+Sample  Binsize rds Ploidy  Cellularity
+CS1_5   30  results/CS1_5/04_relative_CN/30kb/CS1_5_30kb.rds    2   0
+CS1_14  30  results/CS1_14/04_relative_CN/30kb/CS1_14_30kb.rds  2.99    0.73
+CS1_15  50  results/CS1_15/04_relative_CN/50kb/CS1_15_50kb.rds  2   0
+
+# Tab-separated
+# The must-have columns: Sample, Binsize, rds, Ploidy, Cellularity
+## Binsizes are represented with unit as kb.

@@ -4,27 +4,35 @@
 
 import pandas as pd
 
-from scripts.common import get_output_all, get_output_absolute, get_group_file
+from scripts.common import get_output_absolute
 
 # specify the configuration file
 configfile: "config/config.yaml"
 
+# specify the working directory
+working_dir = config['workdir']
+if working_dir[-1] != '/':
+    working_dir = working_dir + '/'
+
 # specify the results location (output directory)
 results = config['outputdir']
+if results[-1] != '/':
+    results = results + '/'
 
 # specify the sample information
 sample_df = (pd.read_csv(config['samp_solutions'], 
     sep='\t',
-    dtype={'Sample':str, 'Patient':str, 'Type':str, 'Group':str, 'Binsize':str, 'rds':str, 'Ploidy':float, 'Cellularity':float})
+    dtype={'Sample':str, 'Binsize':str, 'rds':str, 'Ploidy':float, 'Cellularity':float})
     .set_index('Sample', drop=False))
 
 # specify the final output of the workflow
 """
-The final output of this workflow should be the signature matrices for each group.
+The final output of this workflow should be the signature similarity matrix for each type of signature.
 """
 rule all:
     input:
-        files = get_output_all(sample_df, results)
+        CN_sig_SS = results + 'signatures/CN_sig/CN_sig.SSmatrix.rds',
+        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds'
 
 
 ########## 1 Absolute copy number profiles ####################
@@ -63,7 +71,7 @@ rule rascal_absolute_CN:
 
 ########## 2 CN Signatures ####################
 """
-The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap for both sample-by-component matrix and sample-by-signature matrix) for each group. The matrices containing sample-by-signature information.
+The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap for both sample-by-component matrix and sample-by-signature matrix) for all samples. The matrices containing sample-by-signature information.
 """
 # 2.1 clone the github repository used for signature validation
 rule cn_sig_git:
@@ -94,50 +102,70 @@ rule CN_signature:
         helper = 'workflow/scripts/cnsignatures/helper_functions.R',
         # check all the absolute copy number profiles have successfully been generated
         check_data = rules.cn_sig_check.output,
-        # the input files for each group
-        seg_files = lambda wildcards: get_group_file(sample_df, results, wildcards.group)
+        # the input segment files
+        seg_files = rules.absolute_seg_CN.input
     output:
-        CN_sig = results + 'signatures/{group}/CNsig/{group}_CNsig.{binsize}kb.matrix.rds'
-    wildcard_constraints:
-        binsize="\d+"
+        CN_sig = results + 'signatures/CN_sig/CN_sig.SSmatrix.rds'
     params:
-        groupID = '{group}',
-        binsize = '{binsize}',
-        sample_names = lambda wildcards: sample_df[sample_df['Group'].isin([wildcards.group])].Sample.tolist(),
+        sample_info = config['samp_solutions'],
+        def_SC = 'workflow/scripts/cnsignatures/data/feat_sig_mat.rds',
         indir = results,
-        outdir = results + 'signatures/'
-    threads: 10
+        outdir = results + 'signatures/CN_sig/'
+    threads: 20
     conda: 'envs/CNsig.yaml'
     script: 'scripts/CN_sig.R'
 
 
 ########## 3 Pan-Cancer Signatures ####################
 """
-The final output for this step should be the validated Pan-cancer signature matrix (sample-by-component) for each group. The actural outputs include a sample-by-component matrix txt, a full object RDS containing all information (such as activities and weights), two heatmaps (one for activities and one for sample-by-component).
+The final output for this step should be the validated Pan-cancer signature matrix (sample-by-component) for all samples. The actural outputs include a sample-by-component matrix txt, a full object RDS containing all information (such as activities and weights), two heatmaps (one for activities and one for sample-by-component).
 """
-# 3.1 set up the snakemake environment for running the validation
+# 3.1 download the PanCan signature definiation table
+rule PanCan_def_tab:
+    # user should download the supplements manually
+    # website: https://www-nature-com.ludwig.lub.lu.se/articles/s41586-022-04789-9#Sec17
+    input:
+        config['supple_tab']
+    output:
+        'resources/PanCan.xlsx'
+    params:
+        select_tab = 'workflow/scripts/select_tab.R',
+        folder = config['supple_folder']
+    conda: 'envs/PanCanSig.yaml'
+    shell:'''
+        mv '{input}' resources/Supplementary_Tables_15-22.xlsx
+        Rscript {select_tab} -i resources/Supplementary_Tables_15-22.xlsx -o resources/PanCan.xlsx
+        rm -r {folder}
+    '''
+
+# 3.2 set up the snakemake environment for running the validation
 rule PanCan_sig_env:
+    input:
+        'resources/PanCan.xlsx'
     output:
         "log/PanCan_settle_info.txt"
-    conda: 'envs/PanSig.yaml'
+    conda: 'envs/PanCanSig.yaml'
     script: 'scripts/PanCan_sig_env.R'
 
-# 3.2 use the CINSignatureQuantification package to validate the signatures
+# 3.3 use the CINSignatureQuantification package to validate the signatures
 rule PanCan_sig:
     input:
         env_set = "log/PanCan_settle_info.txt",
-        seg_files = lambda wildcards: get_group_file(sample_df, results, wildcards.group)
+        seg_files = rules.absolute_seg_CN.input
     output:
-        PanSig = results + 'signatures/{group}/PanSig/{group}_PanSig.{binsize}kb.matrix.rds'
-    wildcard_constraints:
-        binsize="\d+"
+        PanCan_sig_SS = results + 'signatures/PanCan_sig/PanCan_sig.SSmatrix.rds'
     params:
-        groupID = '{group}',
-        binsize = '{binsize}',
-        sample_names = lambda wildcards: sample_df[sample_df['Group'].isin([wildcards.group])].Sample.tolist(),
+        sample_info = config['samp_solutions'],
+        def_SC = 'resources/PanCan.xlsx',
         indir = results,
-        outdir = results + 'signatures/'
+        outdir = results + 'signatures/PanCan_sig/'
     threads: 10
-    conda: 'envs/PanSig.yaml'
+    conda: 'envs/PanCanSig.yaml'
     script: 'scripts/PanCan_sig.R'
+
+
+
+
+
+
 

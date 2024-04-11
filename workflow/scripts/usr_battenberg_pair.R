@@ -1,11 +1,11 @@
-# Title: usr_battenberg.R
+# Title: usr_battenberg_pair.R
 # Author: Guyuan TANG
-# Date: 2024/1/26
+# Date: 2024/03/19
 
 # Description: we altered parameters (read depth filter and chromosome names) to fit our sWGS sample data. And the script only includes the first steps for original Battenberg, because we only require those outputs for running further steps in ASCAT.SC.
 
 # Steps:
-## 1. prepare_wgs_cell_line
+## 1. prepare_wgs
 ## 2. run_haplotyping
 
 ######### Battenberg main function (new) #########
@@ -14,7 +14,7 @@ library(foreach)
 library(doParallel)
 library(parallel)
 
-battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_data_file, normal_data_file, imputeinfofile, g1000prefix, problemloci, gccorrectprefix=NULL,
+battenberg_new = function(analysis="paired", tumourname, normalname, tumour_data_file, normal_data_file, imputeinfofile, g1000prefix, problemloci, gccorrectprefix=NULL,
                       repliccorrectprefix=NULL, g1000allelesprefix=NA, ismale=NA, data_type="wgs", impute_exe="impute2", allelecounter_exe="alleleCounter", nthreads=8, platform_gamma=1, phasing_gamma=1,
                       segmentation_gamma=10, segmentation_kmin=3, phasing_kmin=1, clonality_dist_metric=0, ascat_dist_metric=1, min_ploidy=1.6,
                       max_ploidy=4.8, min_rho=0.1, min_goodness=0.63, uninformative_BAF_threshold=0.51, min_normal_depth=10, min_base_qual=20,
@@ -47,6 +47,14 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
     normalname = paste0(tumourname, "_normal")
     # other cell_line specific parameter values
   }
+  if (analysis == "germline"){
+    calc_seg_baf_option=1
+    phasing_gamma=3
+    phasing_kmin=1
+    segmentation_gamma=3
+    segmentation_kmin=3
+  }
+  
   if (data_type=="wgs" & is.na(ismale)) {
     stop("Please provide a boolean denominator whether this sample represents a male donor")
   }
@@ -88,12 +96,12 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
     if (nsamples > 1) {
       print(paste0("Running Battenberg in multisample mode on ", nsamples, " samples: ", paste0(tumourname, collapse = ", ")))
     }
-    chrom_names = get.chrom.names(imputeinfofile, ismale, analysis=analysis)
+    chrom_names = get.chrom.names.new(imputeinfofile, ismale, analysis=analysis)
   } else if (data_type=="snp6" | data_type=="SNP6") {
     if (nsamples > 1) {
       stop(paste0("Battenberg multisample mode has not been tested with SNP6 data"))
     }
-    chrom_names = get.chrom.names.new(imputeinfofile, TRUE)
+    chrom_names = get.chrom.names(imputeinfofile, TRUE)
     logr_file = paste(tumourname, "_mutantLogR.tab", sep="")
     allelecounts_file = NULL
   }
@@ -105,8 +113,9 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
         # Setup for parallel computing
         clp = parallel::makeCluster(nthreads)
         doParallel::registerDoParallel(clp)
+        
         if (analysis == "paired"){
-          Battenberg::prepare_wgs(chrom_names=chrom_names,
+          prepare_wgs_new(chrom_names=chrom_names,
                       tumourbam=tumour_data_file[sampleidx],
                       normalbam=normal_data_file,
                       tumourname=tumourname[sampleidx],
@@ -124,7 +133,7 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
                       skip_allele_counting_normal = (sampleidx > 1))
           
         } else if (analysis == "cell_line") {
-          prepare_wgs_cell_line_new(chrom_names=chrom_names,
+          Battenberg::prepare_wgs_cell_line(chrom_names=chrom_names,
                                 chrom_coord=chrom_coord_file,
                                 tumourbam=tumour_data_file,
                                 tumourname=tumourname,
@@ -144,7 +153,30 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
                                 allelecounter_exe=allelecounter_exe,
                                 min_normal_depth=min_normal_depth,
                                 skip_allele_counting=skip_allele_counting[sampleidx])
+        } else if (analysis == "germline"){
+          #prepare_wgs_germline(chrom_names=chrom_names,
+          #                      chrom_coord=chrom_coord,
+          #                      germlinebam=GERMLINEBAM,
+          #                      germlinename=GERMLINENAME,
+          #                      g1000lociprefix=G1000PREFIX_AC,
+          #                      g1000allelesprefix=G1000PREFIX,
+          #                      gamma_ivd=1e5,
+          #                      kmin_ivd=50,
+          #                      centromere_noise_seg_size=1e6,
+          #                      centromere_dist=5e5,
+          #                      min_het_dist=2e3,
+          #                      gamma_logr=100,
+          #                      length_adjacent=5e4,
+          #                      gccorrectprefix=GCCORRECTPREFIX,
+          #                      repliccorrectprefix=RTCORRECTPREFIX,
+          #                      min_base_qual=MIN_BASE_QUAL,
+          #                      min_map_qual=MIN_MAP_QUAL,
+          #                      allelecounter_exe=ALLELECOUNTER,
+          #                      min_normal_depth=MIN_NORMAL_DEPTH,
+          #                      skip_allele_counting=F)
         }
+        
+        
         # Kill the threads
         parallel::stopCluster(clp)
         
@@ -165,6 +197,7 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
         q(save="no", status=1)
       }
     }
+    
     if (data_type=="snp6" | data_type=="SNP6") {
       # Infer what the gender is - WGS requires it to be specified
       gender = infer_gender_birdseed(birdseed_report_file)
@@ -230,143 +263,52 @@ battenberg_new = function(analysis="cell_line", tumourname, normalname, tumour_d
   }
 }
 
-######## The altered inner functions #########
-### 1. alter the filter on depth
-cell_line_baf_logR_new = function(TUMOURNAME,g1000alleles.prefix,chrom_names){
-  #read heterozygous SNPs per chromosome for alleleCounter files & 1000G allele files####
-  AC=list() # alleleCounts
-  AL=list() # 1000G alleles
-  MaC=list() # matched alleleCounts
-  OHET=list() # HET SNP data
-  for (chr in chrom_names){
-    # read in alleleCounter output for each chromosome
-    ac=read.table(paste0(TUMOURNAME,"_alleleFrequencies_chr",chr,".txt"),stringsAsFactors = F)
-    ac=ac[order(ac$V2),]
-    AC[[chr]]=ac
-    print(length(AC))
-    # match allele counts with respective SNP alleles
-    al=read.table(paste0(g1000alleles.prefix,chr,".txt"),header=T,stringsAsFactors = F)
-    AL[[chr]]=al
-    print(length(AL))
-    #etc
-    ref=al$a0
-    ref_df=data.frame(pos=1:nrow(al),ref=ref+2)
-    REF=ac[cbind(ref_df$pos,ref_df$ref)]
-    alt=al$a1
-    alt_df=data.frame(pos=1:nrow(al),alt=alt+2)
-    ALT=ac[cbind(alt_df$pos,alt_df$alt)]
-    mac=data.frame(ref=REF,alt=ALT)
-    mac$depth=as.numeric(mac$ref)+as.numeric(mac$alt)
-    mac$baf=as.numeric(mac$alt)/as.numeric(mac$depth)
-    o=cbind(al,mac)
-    names(o)=c("Position","a0","a1","ref","alt","depth","baf")
-    MaC[[chr]]=o
-    #extract rows with 0.1=<baf=<0.9
-    ohet=o[which(o$baf>=0.10 & o$baf<=0.90 & o$depth>2),] # the original depth>10
-    ohet$Position2=c(ohet$Position[2:nrow(ohet)],2*ohet$Position[nrow(ohet)]-ohet$Position[nrow(ohet)-1])
-    ohet$Position_dist=ohet$Position2-ohet$Position
-    ohet$Position_dist_percent=ohet$Position_dist/max(ohet$Position_dist)
-    OHET[[chr]]=ohet
-    print(paste("chromosome",chr,"file read"))
-  }
-  # CREATE mutantBAF and mutantLogR *.tab files #
-  cellline=TUMOURNAME
-  MAC=data.frame()
-  for (chr in chrom_names){
-    MaC_CHR=data.frame(chr=chr,MaC[[chr]])
-    MAC=rbind(MAC,MaC_CHR)
-    print(chr)
-  }
-  names(MAC)=c("chr","position","a0","a1","ref","alt","coverage","baf")
-  print(head(MAC))
-  print(dim(MAC))
-  #MAC$logr=log2(MAC$coverage/mean(MAC$coverage))
-  MAC$logr=log2(MAC$coverage/mean(MAC$coverage,na.rm=TRUE)) # in case of coverage == NA due to non-matching alleles or presence of indels in loci file
-  MACC=MAC[which(!is.na(MAC$baf)),]
-  print(nrow(MAC)-nrow(MACC))
-  
-  BAF=data.frame(Chromosome=MACC$chr,Position=MACC$pos,cellline=MACC$baf)
-  names(BAF)[names(BAF) == "cellline"] <- cellline
-  BAF=BAF[order(BAF$Chromosome,BAF$Position),]
-  BAF$Chromosome[BAF$Chromosome==23]="X" # revert back from 23 to X for Chromosome name
-  write.table(BAF,paste0(cellline,"_mutantBAF.tab"),col.names=T,row.names=F,quote=F,sep="\t")
-  rm(BAF)
-  
-  LogR=data.frame(Chromosome=MACC$chr,Position=MACC$pos,cellline=MACC$logr)
-  names(LogR)[names(LogR) == "cellline"] <- cellline
-  LogR=LogR[order(LogR$Chromosome,LogR$Position),]
-  LogR$Chromosome[LogR$Chromosome==23]="X" # revert back from 23 to X for Chromosome name
-  write.table(LogR,paste0(cellline,"_mutantLogR.tab"),col.names=T,row.names=F,quote=F,sep="\t")
-  
-  rm(MAC)
-  rm(MaC)
-  rm(MACC)
-  CL_OHET <<- OHET
-  CL_AL <<- AL
-  CL_AC <<- AC
-  CL_LogR <<- LogR 
-  print("STEP 1 - BAF and LogR - completed")
-}
 
-### 2. new cell line preparation function
-prepare_wgs_cell_line_new = function(chrom_names, chrom_coord, tumourbam, tumourname, g1000lociprefix, g1000allelesprefix, gamma_ivd=1e5, kmin_ivd=50, centromere_noise_seg_size=1e6, 
-                                 centromere_dist=5e5, min_het_dist=1e5, gamma_logr=100, length_adjacent=5e4, gccorrectprefix,repliccorrectprefix, min_base_qual, min_map_qual, 
-                                 allelecounter_exe, min_normal_depth, skip_allele_counting) {
+## the new prepare_wgs_new function
+prepare_wgs_new = function(chrom_names, tumourbam, normalbam, tumourname, normalname, g1000allelesprefix, g1000prefix, gccorrectprefix,
+                       repliccorrectprefix, min_base_qual, min_map_qual, allelecounter_exe, min_normal_depth, nthreads, skip_allele_counting, skip_allele_counting_normal = F) {
   
   requireNamespace("foreach")
   requireNamespace("doParallel")
   requireNamespace("parallel")
   
   if (!skip_allele_counting) {
-    # Obtain allele counts for 1000 Genomes locations for the cell line
+    # Obtain allele counts for 1000 Genomes locations for both tumour and normal
     foreach::foreach(i=1:length(chrom_names)) %dopar% {
       Battenberg::getAlleleCounts(bam.file=tumourbam,
-                      output.file=paste(tumourname,"_alleleFrequencies_chr", i, ".txt", sep=""),
-                      g1000.loci=paste(g1000lociprefix, i, ".txt", sep=""),
+                      output.file=paste(tumourname,"_alleleFrequencies_chr", chrom_names[i], ".txt", sep=""),
+                      g1000.loci=paste(g1000prefix, chrom_names[i], ".txt", sep=""),
                       min.base.qual=min_base_qual,
                       min.map.qual=min_map_qual,
                       allelecounter.exe=allelecounter_exe)
+      
+      if (!skip_allele_counting_normal) {
+        Battenberg::getAlleleCounts(bam.file=normalbam,
+                        output.file=paste(normalname,"_alleleFrequencies_chr", chrom_names[i], ".txt",  sep=""),
+                        g1000.loci=paste(g1000prefix, chrom_names[i], ".txt", sep=""),
+                        min.base.qual=min_base_qual,
+                        min.map.qual=min_map_qual,
+                        allelecounter.exe=allelecounter_exe)
+      }
     }
   }
   
-  # Standardise Chr notation (removes 'chr' string if present; essential for cell_line_baf_logR)
+  # remove the 'chr' in the allele frequency output files
+  Battenberg::standardiseChrNotation(tumourname,normalname)
   
-  Battenberg::standardiseChrNotation(tumourname=tumourname,
-                         normalname=NULL) 
-  
-  # Obtain BAF and LogR from the raw allele counts of the cell line
-  cell_line_baf_logR_new(TUMOURNAME=tumourname,
-                     g1000alleles.prefix=g1000allelesprefix,
-                     chrom_names=chrom_names
-  )
-  
-  # Reconstruct normal-pair allele count files for the cell line
-  
-  foreach::foreach(i=1:length(chrom_names),.export=c("cell_line_reconstruct_normal","CL_OHET","CL_AL","CL_AC","CL_LogR"),.packages=c("copynumber","ggplot2","grid")) %dopar% {
-    
-    Battenberg::cell_line_reconstruct_normal(TUMOURNAME=tumourname,
-                                 NORMALNAME=paste0(tumourname,"_normal"),
-                                 chrom_coord=chrom_coord,
-                                 chrom=i,
-                                 CL_OHET=CL_OHET,
-                                 CL_AL=CL_AL,
-                                 CL_AC=CL_AC,
-                                 CL_LogR=CL_LogR,
-                                 GAMMA_IVD=gamma_ivd,
-                                 KMIN_IVD=kmin_ivd,
-                                 CENTROMERE_NOISE_SEG_SIZE=centromere_noise_seg_size,
-                                 CENTROMERE_DIST=centromere_dist,
-                                 MIN_HET_DIST=min_het_dist,
-                                 GAMMA_LOGR=gamma_logr,
-                                 LENGTH_ADJACENT=length_adjacent)
-  }
-  
-  if (length(list.files(pattern="normal_alleleFrequencies"))==length(chrom_names)){
-    print("STEP 2 - Normal allelecounts reconstruction - completed")
-  } else { 
-    stop("Missing 'normal' allelecount files - all chromosomes NOT reconstructed")
-  }
-  
+  # Obtain BAF and LogR from the raw allele counts
+  Battenberg::getBAFsAndLogRs(tumourAlleleCountsFile.prefix=paste(tumourname,"_alleleFrequencies_chr", sep=""),
+                  normalAlleleCountsFile.prefix=paste(normalname,"_alleleFrequencies_chr", sep=""),
+                  figuresFile.prefix=paste(tumourname, "_", sep=''),
+                  BAFnormalFile=paste(tumourname,"_normalBAF.tab", sep=""),
+                  BAFmutantFile=paste(tumourname,"_mutantBAF.tab", sep=""),
+                  logRnormalFile=paste(tumourname,"_normalLogR.tab", sep=""),
+                  logRmutantFile=paste(tumourname,"_mutantLogR.tab", sep=""),
+                  combinedAlleleCountsFile=paste(tumourname,"_alleleCounts.tab", sep=""),
+                  chr_names=chrom_names,
+                  g1000file.prefix=g1000allelesprefix,
+                  minCounts=min_normal_depth,
+                  samplename=tumourname)
   # Perform GC correction
   Battenberg::gc.correct.wgs(Tumour_LogR_file=paste(tumourname,"_mutantLogR.tab", sep=""),
                  outfile=paste(tumourname,"_mutantLogR_gcCorrected.tab", sep=""),
@@ -375,6 +317,10 @@ prepare_wgs_cell_line_new = function(chrom_names, chrom_coord, tumourbam, tumour
                  replic_timing_file_prefix=repliccorrectprefix,
                  chrom_names=chrom_names)
 }
+
+
+
+
 
 ## required check.imputeinfofile
 check.imputeinfofile = function(imputeinfofile, is.male, usebeagle) {
@@ -392,3 +338,12 @@ check.imputeinfofile = function(imputeinfofile, is.male, usebeagle) {
   }
 }
 
+# new get.chrom.names function to excclude X 
+get.chrom.names.new = function(imputeinfofile, is.male, chrom=NA, analysis="paired") {
+  chrom_names = unique(parse.imputeinfofile(imputeinfofile, is.male, chrom=chrom)$chrom)
+  if (analysis=="cell_line" | analysis=="germline" | analysis=="paired") {
+    # Both cell line and germline analysis do not yield usable data on X and Y, so remove
+    chrom_names = chrom_names[!chrom_names %in% c("X", "Y")]
+  }
+  return(chrom_names)
+}
