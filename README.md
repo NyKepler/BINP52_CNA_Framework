@@ -32,7 +32,7 @@ The version of tools and packages to be used will be specified in each step (see
 - `feat_sig_mat.rds` is the signature-by-component definition matrix for HGSC CN signatures.  
 - `PanCan.xlsx` and `PanCan_def.rds` are both the signature-by-component definition matrix for pan-cancer CIN signatures.  
 - `Panconusig_id.txt` and `panConusig_def.rds` are both the signature-by-component definition matrix for panConusig signatures.  
-- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead.  
+- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead. Also, you can download the [provided references](https://ora.ox.ac.uk/objects/uuid:2c1fec09-a504-49ab-9ce9-3f17bac531bc) and use the script `correct_ref_chr.sh` to modify the files.  
 
 `workflow` is the main folder containing Snakemake pipelines, environment setting yaml files, and scripts used by the workflow.  
 `Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
@@ -42,6 +42,7 @@ The version of tools and packages to be used will be specified in each step (see
 - `solution_stat.R` was used to analyze the solution outputs from *Part I Solutions*.  
 - `get_solutions_samptab.R` was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
 - `select_tab.R` was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
+- `correct_ref_chr.sh` was used to modify the chromosome names in the reference files provided by Battenberg to fit in our data.  
 
 
 ## 2. Operation guide
@@ -533,7 +534,7 @@ rule CN_signature:
     script: 'scripts/CN_sig.R'
 ```
 
-#### 3.2.3 Pan-Cancer signatures
+#### 3.2.3 Pan-Cancer CIN signatures
 This step will generate the sample-by-component matrix and the sample-by-signature matrix based on the recent published pan-cancer CIN signatures (Drews *et al.,* 2022).  
 *Tools, Packages and Dependencies*
 ```
@@ -810,6 +811,11 @@ write.table(df, file = paste0(ASCAT_out, sampleID, '_as_cna_profile.tsv'), quote
 ```
 
 Finally, we used the outputs from the above step to extract the sample-by-component matrix as well as the samply-by-signature cosine similarity matrix (see `workflow/scripts/panConusig_pair_local_3.R` for details).
+
+## References
+1. Macintyre G, Goranova TE, De Silva D, Ennis D, Piskorz AM, Eldridge M, et al. Copy number signatures and mutational processes in ovarian carcinoma. Nat Genet. 2018 Sep;50(9):1262–70.  
+2. Drews RM, Hernando B, Tarabichi M, Haase K, Lesluyes T, Smith PS, et al. A pan-cancer compendium of chromosomal instability. Nature. 2022 Jun;606(7916):976–83.  
+3. Steele CD, Abbasi A, Islam SMA, Bowes AL, Khandekar A, Haase K, et al. Signatures of copy number alterations in human cancer. Nature. 2022 Jun;606(7916):984–91.  
 
 ## Acknowledgement
 Thanks a lot to all the support and advice from [Ingrid Lab](https://github.com/IngridHLab)!

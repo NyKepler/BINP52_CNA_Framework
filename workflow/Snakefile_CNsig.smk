@@ -71,7 +71,7 @@ rule rascal_absolute_CN:
 
 ########## 2 CN Signatures ####################
 """
-The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap for both sample-by-component matrix and sample-by-signature matrix) for each group. The matrices containing sample-by-signature information.
+The final output for this step would be the matrix files (including a matrix txt file, a matrix object RDS, a simple heatmap for both sample-by-component matrix and sample-by-signature matrix) for all samples. The matrices containing sample-by-signature information.
 """
 # 2.1 clone the github repository used for signature validation
 rule cn_sig_git:
@@ -118,7 +118,7 @@ rule CN_signature:
 
 ########## 3 Pan-Cancer Signatures ####################
 """
-The final output for this step should be the validated Pan-cancer signature matrix (sample-by-component) for each group. The actural outputs include a sample-by-component matrix txt, a full object RDS containing all information (such as activities and weights), two heatmaps (one for activities and one for sample-by-component).
+The final output for this step should be the validated Pan-cancer signature matrix (sample-by-component) for all samples. The actural outputs include a sample-by-component matrix txt, a full object RDS containing all information (such as activities and weights), two heatmaps (one for activities and one for sample-by-component).
 """
 # 3.1 download the PanCan signature definiation table
 rule PanCan_def_tab:
