@@ -1029,7 +1029,7 @@ groups2 <- c('ArchivalVS','MaNiLaVS','ffTissue','Endome','ffpe','Blood','ffPlasm
 
 #### top 1 enriched signature
 PanCan_info_df <- sig_stat_enrich(stat_df = PanCan_stat, enrich_num = 1, sig_type = 'PanCan')
-PanCan_info_df$enrich_PanCan_1 <- factor(PanCan_info_df$enrich_PanCan_1, levels = c('CX1', 'CX2', 'CX3', 'CX5', 'CX15', 'CX17'))
+PanCan_info_df$enrich_PanCan_1 <- factor(PanCan_info_df$enrich_PanCan_1, levels = paste0('CX',c(1:17)))
 # plot the graph
 PanCan_enrich_plot_1 <- ggplot(data = PanCan_info_df, aes(x=BH, y=percentage, fill=enrich_PanCan_1)) +
   geom_bar(stat = 'identity', width = 0.5, position = position_stack(reverse = T)) +
@@ -1043,7 +1043,7 @@ write_xlsx(PanCan_info_df, path = 'PanCan_group_1.xlsx')
 
 #### top 2 enrich signature
 PanCan_info_df <- sig_stat_enrich(stat_df = PanCan_stat, enrich_num = 2, sig_type = 'PanCan')
-PanCan_info_df$enrich_PanCan_2 <- factor(PanCan_info_df$enrich_PanCan_2, levels = c('CX1', 'CX2', 'CX3', 'CX5', 'CX10', 'CX15', 'CX17'))
+PanCan_info_df$enrich_PanCan_2 <- factor(PanCan_info_df$enrich_PanCan_2, levels = paste0('CX',c(1:17)))
 # plot the graph
 PanCan_enrich_plot_2 <- ggplot(data = PanCan_info_df, aes(x=BH, y=percentage, fill=enrich_PanCan_2)) +
   geom_bar(stat = 'identity', width = 0.5, position = position_stack(reverse = T)) +
@@ -1543,4 +1543,169 @@ RRSO_ref_exposure_plot_1 <- RRSO_ref_exposure_plot + theme(axis.text.y = element
 HGSC_tumor_exposure_plot_1 <- HGSC_tumor_exposure_plot + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank())
 panConusig_ref_exposure_plot <- ggarrange(Benign_tissue_exposure_plot, RRSO_ref_exposure_plot_1, HGSC_tumor_exposure_plot_1, ncol = 3, common.legend = 1, legend.grob = get_legend(Benign_tissue_exposure_plot), legend = 'right')
 ggsave('panConusig/cosine_similarity/Figures/ref_exposure_all.pdf', plot = panConusig_ref_exposure_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+###### 4. Same patient different signatures ######
+### HGSC_81 was selected
+# 1. CN signatures
+## load the information
+CN_stat_81 <- filter(CN_stat, patient=='HGSC_81')
+CN_exp_81_pre_6 <- CN_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS1_31','CS1_5'))
+CN_exp_81_pre_0 <- CN_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_36')
+CN_exp_81_diag <- CN_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_84')
+CN_exp_81_tumor <- CN_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_14')
+## plotting
+#1
+pre_6_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_81_pre_6, sig_type = 'CN', ref_stat_df = CN_stat_81) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+pre_0_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_81_pre_0, sig_type = 'CN', ref_stat_df = CN_stat_81)  + labs(title = 'prediagnostic 0-6m, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+diag_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_81_diag, sig_type = 'CN', ref_stat_df = CN_stat_81)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#4
+tumor_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_81_tumor, sig_type = 'CN', ref_stat_df = CN_stat_81) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_81_plot <- ggarrange(pre_6_81_exposure_plot, pre_0_81_exposure_plot, diag_81_exposure_plot, tumor_81_exposure_plot, ncol = 4, common.legend = 1, legend.grob = get_legend(pre_6_81_exposure_plot), legend = 'right')
+ggsave('Brenton/cosine_similarity/Figures/HGSC_81_exposure.pdf', plot = Exp_81_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 2. pan-cancer CIN signatures
+## load the information
+PanCan_stat_81 <- filter(PanCan_stat, patient=='HGSC_81')
+PanCan_exp_81_pre_0 <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_36')
+PanCan_exp_81_tumor <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_14')
+## plotting
+#1
+pre_0_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_81_pre_0, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_81) + labs(title = 'prediagnostic 0-6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+tumor_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_81_tumor, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_81) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_81_plot <- ggarrange(pre_0_81_exposure_plot, tumor_81_exposure_plot, ncol = 2, common.legend = 1, legend.grob = get_legend(pre_0_81_exposure_plot), legend = 'right')
+ggsave('Pan-Cancer/cosine_similarity/Figures/HGSC_81_exposure.pdf', plot = Exp_81_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 3. panConusig signatures
+## load the information
+panConusig_stat_81 <- filter(panConusig_stat, patient=='HGSC_81')
+panConusig_exp_81_pre_6 <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS1_31','CS1_5'))
+panConusig_exp_81_pre_0 <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_36')
+panConusig_exp_81_diag <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_84')
+panConusig_exp_81_tumor <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample=='CS1_14')
+## plotting
+#1
+pre_6_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_81_pre_6, sig_type = 'panConusig', ref_stat_df = panConusig_stat_81) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+pre_0_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_81_pre_0, sig_type = 'panConusig', ref_stat_df = panConusig_stat_81)  + labs(title = 'prediagnostic 0-6m, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+diag_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_81_diag, sig_type = 'panConusig', ref_stat_df = panConusig_stat_81)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#4
+tumor_81_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_81_tumor, sig_type = 'panConusig', ref_stat_df = panConusig_stat_81) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_81_plot <- ggarrange(pre_6_81_exposure_plot, pre_0_81_exposure_plot, diag_81_exposure_plot, tumor_81_exposure_plot, ncol = 4, common.legend = 1, legend.grob = get_legend(pre_6_81_exposure_plot), legend = 'right')
+ggsave('panConusig/cosine_similarity/Figures/HGSC_81_exposure.pdf', plot = Exp_81_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+### HGSC_96 was selected
+# 1. CN signatures
+## load the information
+CN_stat_96 <- filter(CN_stat, patient=='HGSC_96')
+CN_exp_96_pre_6 <- CN_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_73','CS2_75','CS2_87','CS2_88','CS2_89','CS2_90','CS2_91','CS2_102','CS2_103','CS2_115'))
+CN_exp_96_diag <- CN_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_28','CS2_85','CS2_86'))
+CN_exp_96_tumor <- CN_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_13')
+## plotting
+#1
+pre_6_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_96_pre_6, sig_type = 'CN', ref_stat_df = CN_stat_96) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+diag_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_96_diag, sig_type = 'CN', ref_stat_df = CN_stat_96)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+tumor_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_96_tumor, sig_type = 'CN', ref_stat_df = CN_stat_96) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_96_plot <- ggarrange(pre_6_96_exposure_plot, diag_96_exposure_plot, tumor_96_exposure_plot, ncol = 3, common.legend = 1, legend.grob = get_legend(pre_6_96_exposure_plot), legend = 'right')
+ggsave('Brenton/cosine_similarity/Figures/HGSC_96_exposure.pdf', plot = Exp_96_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 2. pan-cancer CIN signatures
+## load the information
+PanCan_stat_96 <- filter(PanCan_stat, patient=='HGSC_96')
+PanCan_exp_96_pre_6 <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_102','CS2_73'))
+PanCan_exp_96_tumor <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_13')
+## plotting
+#1
+pre_6_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_96_pre_6, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_96) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+tumor_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_96_tumor, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_96) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_96_plot <- ggarrange(pre_6_96_exposure_plot, tumor_96_exposure_plot, ncol = 2, common.legend = 1, legend.grob = get_legend(pre_6_96_exposure_plot), legend = 'right')
+ggsave('Pan-Cancer/cosine_similarity/Figures/HGSC_96_exposure.pdf', plot = Exp_96_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 3. panConusig signatures
+## load the information
+panConusig_stat_96 <- filter(panConusig_stat, patient=='HGSC_96')
+panConusig_exp_96_pre_6 <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_73','CS2_75','CS2_87','CS2_88','CS2_89','CS2_90','CS2_91','CS2_102','CS2_103','CS2_115'))
+panConusig_exp_96_diag <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample%in% c('CS2_28','CS2_85','CS2_86'))
+panConusig_exp_96_tumor <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_13')
+## plotting
+#1
+pre_6_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_96_pre_6, sig_type = 'panConusig', ref_stat_df = panConusig_stat_96) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+diag_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_96_diag, sig_type = 'panConusig', ref_stat_df = panConusig_stat_96)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+tumor_96_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_96_tumor, sig_type = 'panConusig', ref_stat_df = panConusig_stat_96) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_96_plot <- ggarrange(pre_6_96_exposure_plot, diag_96_exposure_plot, tumor_96_exposure_plot, ncol = 3, common.legend = 1, legend.grob = get_legend(pre_6_96_exposure_plot), legend = 'right')
+ggsave('panConusig/cosine_similarity/Figures/HGSC_96_exposure.pdf', plot = Exp_96_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+
+### HGSC_70 was selected
+# 1. CN signatures
+## load the information
+CN_stat_70 <- filter(CN_stat, patient=='HGSC_70')
+CN_exp_70_pre_6 <- CN_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_81','CS2_82'))
+CN_exp_70_diag <- CN_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_26','CS2_125'))
+CN_exp_70_tumor <- CN_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_11')
+## plotting
+#1
+pre_6_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_70_pre_6, sig_type = 'CN', ref_stat_df = CN_stat_70) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+diag_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_70_diag, sig_type = 'CN', ref_stat_df = CN_stat_70)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+tumor_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = CN_exp_70_tumor, sig_type = 'CN', ref_stat_df = CN_stat_70) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_70_plot <- ggarrange(pre_6_70_exposure_plot, diag_70_exposure_plot, tumor_70_exposure_plot, ncol = 3, common.legend = 1, legend.grob = get_legend(pre_6_70_exposure_plot), legend = 'right')
+ggsave('Brenton/cosine_similarity/Figures/HGSC_70_exposure.pdf', plot = Exp_70_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 2. pan-cancer CIN signatures
+## load the information
+PanCan_stat_70 <- filter(PanCan_stat, patient=='HGSC_70')
+PanCan_exp_70_pre_6 <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_82'))
+PanCan_exp_70_tumor <- PanCan_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_11')
+## plotting
+#1
+pre_6_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_70_pre_6, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_70) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+tumor_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = PanCan_exp_70_tumor, sig_type = 'Pan-Cancer', ref_stat_df = PanCan_stat_70) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_70_plot <- ggarrange(pre_6_70_exposure_plot, tumor_70_exposure_plot, ncol = 2, common.legend = 1, legend.grob = get_legend(pre_6_70_exposure_plot), legend = 'right')
+ggsave('Pan-Cancer/cosine_similarity/Figures/HGSC_70_exposure.pdf', plot = Exp_70_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
+
+# 3. panConusig signatures
+## load the information
+panConusig_stat_70 <- filter(panConusig_stat, patient=='HGSC_70')
+panConusig_exp_70_pre_6 <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample %in% c('CS2_81','CS2_82'))
+panConusig_exp_70_diag <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample%in% c('CS2_26','CS2_125'))
+panConusig_exp_70_tumor <- panConusig_exposure %>% select(!SS_sum) %>% filter(sample=='CS2_11')
+## plotting
+#1
+pre_6_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_70_pre_6, sig_type = 'panConusig', ref_stat_df = panConusig_stat_70) + labs(title = 'prediagnostic > 6m, VS') + theme(plot.title = element_text(size = 10, hjust = 0.5))
+#2
+diag_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_70_diag, sig_type = 'panConusig', ref_stat_df = panConusig_stat_70)  + labs(title = 'diagnostic, VS') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#3
+tumor_70_exposure_plot <- ref_exposure_plot(ref_exposure_df = panConusig_exp_70_tumor, sig_type = 'panConusig', ref_stat_df = panConusig_stat_70) + labs(title = 'ffTumor') + theme(axis.text.y = element_blank(), axis.title.y = element_blank(), axis.ticks.y = element_blank(), plot.title = element_text(size = 10, hjust = 0.5))
+#combine
+Exp_70_plot <- ggarrange(pre_6_70_exposure_plot, diag_70_exposure_plot, tumor_70_exposure_plot, ncol = 3, common.legend = 1, legend.grob = get_legend(pre_6_70_exposure_plot), legend = 'right')
+ggsave('panConusig/cosine_similarity/Figures/HGSC_70_exposure.pdf', plot = Exp_70_plot, dpi = 600, width = 10, height = 5, units = 'in')
+
 
