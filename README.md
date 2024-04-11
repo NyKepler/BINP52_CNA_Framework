@@ -32,7 +32,7 @@ The version of tools and packages to be used will be specified in each step (see
 - `feat_sig_mat.rds` is the signature-by-component definition matrix for HGSC CN signatures.  
 - `PanCan.xlsx` and `PanCan_def.rds` are both the signature-by-component definition matrix for pan-cancer CIN signatures.  
 - `Panconusig_id.txt` and `panConusig_def.rds` are both the signature-by-component definition matrix for panConusig signatures.  
-- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead. Also, you can download the [provided references](https://ora.ox.ac.uk/objects/uuid:2c1fec09-a504-49ab-9ce9-3f17bac531bc) and use the script `correct_ref_chr.sh` to modify the files.  
+- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, please contact us if you require the modified references. Also, you can download the [provided references](https://ora.ox.ac.uk/objects/uuid:2c1fec09-a504-49ab-9ce9-3f17bac531bc) and use the script `correct_ref_chr.sh` to modify the files.  
 
 `workflow` is the main folder containing Snakemake pipelines, environment setting yaml files, and scripts used by the workflow.  
 `Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
