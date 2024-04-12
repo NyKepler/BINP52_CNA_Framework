@@ -46,6 +46,7 @@ The version of tools and packages to be used will be specified in each step (see
 
 
 ## 2. Operation guide
+At least 30 threads is recommended for running our workflow.
 ### 2.1 Workflow *Part I Solutions* 
 ```
 # activate the conda environment installing snakemake
@@ -62,7 +63,7 @@ Note: this step works for HGSC CN signatures as well as pan-cancer CIN signature
 conda activate snakemake
 # move into the working directory where you downloaded the github repository
 cd <path to the downloaded github repository>
-# run the pipeline, for example, 30 threads
+# run the pipeline, at least 30 threads is suggested
 snakemake --use-conda --configfile config/config.yaml --cores 30 --snakefile workflow/Snakefile_CNsig.smk
 ```
 ### 2.3 Workflow *Part III panConusig* 
