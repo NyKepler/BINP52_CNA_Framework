@@ -36,13 +36,13 @@ The version of tools and packages to be used will be specified in each step (see
 
 `workflow` is the main folder containing Snakemake pipelines, environment setting yaml files, and scripts used by the workflow.  
 `Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
-- `get_sample.py` was used to generate the input sample sheet for *Part I Solutions*.  
-- `preprocess_stat.R` was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
-- `All_Sample_Solutions.py` was used to extract the solutions (ploidy and cellularity) from *Part I Solutions* for each sample under different bin sizes.  
-- `solution_stat.R` was used to analyze the solution outputs from *Part I Solutions*.  
-- `get_solutions_samptab.R` was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
-- `select_tab.R` was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
-- `correct_ref_chr.sh` was used to modify the chromosome names in the reference files provided by Battenberg to fit in our data.  
+- [get_sample.py](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/get_sample.py) was used to generate the input sample sheet for *Part I Solutions*.  
+- [preprocess_stat.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/preprocess_stat.R) was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
+- [All_Sample_Solutions.py](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/All_Sample_Solutions.py) was used to extract the solutions (ploidy and cellularity) from *Part I Solutions* for each sample under different bin sizes.  
+- [solution_stat.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/solution_stat.R) was used to analyze the solution outputs from *Part I Solutions*.  
+- [get_solutions_samptab.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/get_solutions_samptab.R) was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
+- [select_tab.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/select_tab.R) was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
+- [correct_ref_chr.sh](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/correct_ref_chr.sh) was used to modify the chromosome names in the reference files provided by Battenberg to fit in our data.  
 
 
 ## 2. Operation guide
