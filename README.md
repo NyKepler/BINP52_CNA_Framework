@@ -32,20 +32,21 @@ The version of tools and packages to be used will be specified in each step (see
 - `feat_sig_mat.rds` is the signature-by-component definition matrix for HGSC CN signatures.  
 - `PanCan.xlsx` and `PanCan_def.rds` are both the signature-by-component definition matrix for pan-cancer CIN signatures.  
 - `Panconusig_id.txt` and `panConusig_def.rds` are both the signature-by-component definition matrix for panConusig signatures.  
-- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, we provide link to download them instead. Also, you can download the [provided references](https://ora.ox.ac.uk/objects/uuid:2c1fec09-a504-49ab-9ce9-3f17bac531bc) and use the script `correct_ref_chr.sh` to modify the files.  
+- `battenberg` folder should contain the reference files for *Part III* to run. But since the sizes of these files are too large to be saved in github, please contact us if you require the modified references. Also, you can download the [provided references](https://ora.ox.ac.uk/objects/uuid:2c1fec09-a504-49ab-9ce9-3f17bac531bc) and use the script `correct_ref_chr.sh` to modify the files.  
 
 `workflow` is the main folder containing Snakemake pipelines, environment setting yaml files, and scripts used by the workflow.  
 `Other_scripts` contains scripts outside the workflow, including sample sheet generation, solution statistics, and signature analyses. Details as the followings:  
-- `get_sample.py` was used to generate the input sample sheet for *Part I Solutions*.  
-- `preprocess_stat.R` was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
-- `All_Sample_Solutions.py` was used to extract the solutions (ploidy and cellularity) from *Part I Solutions* for each sample under different bin sizes.  
-- `solution_stat.R` was used to analyze the solution outputs from *Part I Solutions*.  
-- `get_solutions_samptab.R` was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
-- `select_tab.R` was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
-- `correct_ref_chr.sh` was used to modify the chromosome names in the reference files provided by Battenberg to fit in our data.  
+- [get_sample.py](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/get_sample.py) was used to generate the input sample sheet for *Part I Solutions*.  
+- [preprocess_stat.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/preprocess_stat.R) was used to analyze the performance of the preprocessing steps in *Part I Solutions*.  
+- [All_Sample_Solutions.py](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/All_Sample_Solutions.py) was used to extract the solutions (ploidy and cellularity) from *Part I Solutions* for each sample under different bin sizes.  
+- [solution_stat.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/solution_stat.R) was used to analyze the solution outputs from *Part I Solutions*.  
+- [get_solutions_samptab.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/get_solutions_samptab.R) was used to generate the input sample sheet containing selected bin sizes for *Part II Signatures*.  
+- [select_tab.R](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/select_tab.R) was used to extract the signature-by-component definition matrix for pan-cancer CIN signatures from the reference files they provided. We have stored the definition matrix as `resources/PanCan.xlsx` as well as `resources/PanCan_def.rds`.  
+- [correct_ref_chr.sh](https://github.com/GuyuanTang/BINP52_CNA_Framework/blob/main/Other_scripts/correct_ref_chr.sh) was used to modify the chromosome names in the reference files provided by Battenberg to fit in our data.  
 
 
 ## 2. Operation guide
+At least 30 threads is recommended for running our workflow.
 ### 2.1 Workflow *Part I Solutions* 
 ```
 # activate the conda environment installing snakemake
@@ -62,7 +63,7 @@ Note: this step works for HGSC CN signatures as well as pan-cancer CIN signature
 conda activate snakemake
 # move into the working directory where you downloaded the github repository
 cd <path to the downloaded github repository>
-# run the pipeline, for example, 30 threads
+# run the pipeline, at least 30 threads is suggested
 snakemake --use-conda --configfile config/config.yaml --cores 30 --snakefile workflow/Snakefile_CNsig.smk
 ```
 ### 2.3 Workflow *Part III panConusig* 
@@ -815,7 +816,9 @@ Finally, we used the outputs from the above step to extract the sample-by-compon
 ## 4. Signature Analysis
 After the workflow, we performed signature analyses on the sample-by-signature cosine similarity matrices for all three types of signatures. Code details can be found in `Other_scripts/analysis_signature.R`.
 - Firstly, we would like to investigate the signatures that shared most similar patterns with our samples. We excluded the samples with a second highest similarity less than 0.5. Then we calculated the delta values between the first and second highest similarities to identify how unique the most similar signatures were as well as how possible that the samples had two close signatures that may mask each other. We tested cut-offs at 0.1 and 0.25 on delta-values to select the best threshold for each type of samples.  
-- Secondly, we presented the signature similarities as exposure to identify the profile patterns. To focus on more similar signatures, we adjusted the similarities less than 0.5 into 0, and normalized all the values by dividing the sum of similarity for each sample.
+- Secondly, we presented the signature similarities as exposure to identify the profile patterns. To focus on more similar signatures, we adjusted the similarities less than 0.5 into 0, and normalized all the values by dividing the sum of similarity for each sample.  
+
+To discover whether the signature similarity exposure profiles of VS samples differ among timepoints collected the samples, we performed the exposure analyses on all VS samples but different women categories as well as on the same patient but different timepoints.
 
 ## References
 1. Macintyre G, Goranova TE, De Silva D, Ennis D, Piskorz AM, Eldridge M, et al. Copy number signatures and mutational processes in ovarian carcinoma. Nat Genet. 2018 Sep;50(9):1262–70.  
